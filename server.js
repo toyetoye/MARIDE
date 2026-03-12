@@ -85,7 +85,24 @@ function seedAdmin() {
 seedAdmin();
 
 // ── Middleware ─────────────────────────────────────────────────────────────
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://custodian.forcap.io',
+    'https://sire.forcap.io',
+    'https://oracle.forcap.io',
+    'https://spares.forcap.io',
+    'https://forcap.io',
+    /\.forcap\.io$/,
+    /\.onrender\.com$/,
+    'http://localhost:3000',
+    'http://localhost:10000',
+  ],
+  credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','x-auth-token','Authorization'],
+}));
+// Handle preflight for all routes
+app.options('*', cors());
 app.use(express.json({ limit: '20mb' }));
 
 // ── Subdomain routing — custodian.forcap.io is now a separate static site ──
@@ -8705,4 +8722,3 @@ app.get('/api/pms/stats', requireAuth, (req, res) => {
     res.json(JSON.parse(fs.readFileSync(PMS_STATS_PATH, 'utf8')));
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
-
