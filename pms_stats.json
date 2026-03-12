@@ -1,0 +1,454 @@
+{
+  "Alfred Temile": {
+    "total_records": 3143,
+    "planned_count": 3097,
+    "adhoc_count": 46,
+    "by_year": {
+      "2024": 966,
+      "2025": 1892,
+      "2026": 285
+    },
+    "failure_hotspots": [
+      {
+        "code": "570.21",
+        "description": "No.2 H.F.O. Purifier",
+        "count": 4
+      },
+      {
+        "code": "350.10",
+        "description": "No.1 Main Generator Engine (Stb'd)",
+        "count": 3
+      },
+      {
+        "code": "350.30",
+        "description": "No.3 Main Generator Engine (Port)",
+        "count": 3
+      },
+      {
+        "code": "570.41",
+        "description": "No.2 Lube Oil Purifier",
+        "count": 3
+      },
+      {
+        "code": "134.52",
+        "description": "Bilge Water Holding Tank (12-20)",
+        "count": 2
+      },
+      {
+        "code": "570.11",
+        "description": "No.1 H.F.O. Purifier",
+        "count": 2
+      },
+      {
+        "code": "570.31",
+        "description": "No.1 Lube Oil Purifier",
+        "count": 2
+      },
+      {
+        "code": "100.20",
+        "description": "Shell plating",
+        "count": 1
+      },
+      {
+        "code": "190.35",
+        "description": "Steering gear hyd oil storage tank",
+        "count": 1
+      },
+      {
+        "code": "270.11",
+        "description": "No.1 Cargo Tank - Deepwell Pump Motor - Stb'd",
+        "count": 1
+      }
+    ],
+    "done_by": {
+      "3rd Eng": 582,
+      "4th Eng": 573,
+      "2nd Eng": 484,
+      "Elect": 476,
+      "Chief Off": 379,
+      "3rd Off": 338,
+      "2nd Off": 204,
+      "Chief Eng": 99
+    }
+  },
+  "LNG Bonny II": {
+    "total_records": 27537,
+    "planned_count": 25930,
+    "adhoc_count": 1607,
+    "by_year": {
+      "2020": 4572,
+      "2021": 3801,
+      "2022": 4190,
+      "2023": 4520,
+      "2024": 4747,
+      "2025": 5054,
+      "2026": 653
+    },
+    "failure_hotspots": [
+      {
+        "code": "320.20",
+        "description": "No.2 Main Generator Engine (Stb'd Centre)",
+        "count": 59
+      },
+      {
+        "code": "320.10",
+        "description": "No.1 Main Generator Engine (Stb'd Outer)",
+        "count": 46
+      },
+      {
+        "code": "320.30",
+        "description": "No.3 Main Generator Engine (Stb'd Inner)",
+        "count": 41
+      },
+      {
+        "code": "320.50",
+        "description": "No.5 Main Generator Engine (Port Outer)",
+        "count": 36
+      },
+      {
+        "code": "320.40",
+        "description": "No.4 Main Generator Engine (Port Inner)",
+        "count": 34
+      },
+      {
+        "code": "490.11",
+        "description": "Starboard Geny. Eng. - No.1 Pilot Fuel Pump (SO)",
+        "count": 27
+      },
+      {
+        "code": "535.11",
+        "description": "No.1 General Servicel Air Compressor (Stb'd For'd)",
+        "count": 26
+      },
+      {
+        "code": "906.10",
+        "description": "Gas Detection System",
+        "count": 26
+      },
+      {
+        "code": "582.10",
+        "description": "Bilge Water Separator",
+        "count": 24
+      },
+      {
+        "code": "253.11",
+        "description": "Inert Gas Generator",
+        "count": 20
+      }
+    ],
+    "done_by": {
+      "4th Eng": 4556,
+      "2nd Eng": 4326,
+      "Cargo Eng": 4002,
+      "3rd Eng": 3649,
+      "Elect": 2817,
+      "Chief Eng": 2585,
+      "Chief Off": 2438,
+      "3rd Off": 1796
+    }
+  },
+  "LNG Finima II": {
+    "total_records": 25559,
+    "planned_count": 24738,
+    "adhoc_count": 821,
+    "by_year": {
+      "2020": 3909,
+      "2021": 4108,
+      "2022": 4059,
+      "2023": 3968,
+      "2024": 4574,
+      "2025": 4280,
+      "2026": 661
+    },
+    "failure_hotspots": [
+      {
+        "code": "906.10",
+        "description": "Gas Detection System - Control",
+        "count": 35
+      },
+      {
+        "code": "535.11",
+        "description": "No.1 G/S & Control Air Compressor",
+        "count": 28
+      },
+      {
+        "code": "535.41",
+        "description": "No.4 G/S & Control Air Compressor",
+        "count": 18
+      },
+      {
+        "code": "535.31",
+        "description": "No.3 G/S & Control Air Compressor",
+        "count": 17
+      },
+      {
+        "code": "570.31",
+        "description": "No.1 Generator Engine Lube Oil Purifier",
+        "count": 15
+      },
+      {
+        "code": "320.10",
+        "description": "No.1 Main Generator Engine",
+        "count": 14
+      },
+      {
+        "code": "580.10",
+        "description": "Incinerator",
+        "count": 14
+      },
+      {
+        "code": "233.10",
+        "description": "Cargo Valve Hydraulic System",
+        "count": 13
+      },
+      {
+        "code": "843.31",
+        "description": "No.1 M.G.E. Electronic Controls",
+        "count": 13
+      },
+      {
+        "code": "320.20",
+        "description": "No.2 Main Generator Engine",
+        "count": 12
+      }
+    ],
+    "done_by": {
+      "Cargo Eng": 5064,
+      "2nd Eng": 3926,
+      "3rd Eng": 3623,
+      "4th Eng": 3493,
+      "Elect": 2858,
+      "Chief Off": 2649,
+      "3rd Off": 1484,
+      "Chief Eng": 1466
+    }
+  },
+  "LNG Lagos II": {
+    "total_records": 25892,
+    "planned_count": 24939,
+    "adhoc_count": 953,
+    "by_year": {
+      "2020": 3974,
+      "2021": 4200,
+      "2022": 3756,
+      "2023": 4605,
+      "2024": 4497,
+      "2025": 4311,
+      "2026": 549
+    },
+    "failure_hotspots": [
+      {
+        "code": "906.10",
+        "description": "Gas Detection System",
+        "count": 21
+      },
+      {
+        "code": "320.10",
+        "description": "No.1 Main Generator Engine (Stb'd Outer)",
+        "count": 20
+      },
+      {
+        "code": "848.10",
+        "description": "Integrated Alarm & Control System (ICAS)",
+        "count": 20
+      },
+      {
+        "code": "320.20",
+        "description": "No.2 Main Generator Engine (Stb'd Centre)",
+        "count": 18
+      },
+      {
+        "code": "843.31",
+        "description": "No.1 M.G.E. Electronic Controls (Stb'd Outer)",
+        "count": 18
+      },
+      {
+        "code": "906.21",
+        "description": "Machinery Spaces - Oil Mist Detector",
+        "count": 18
+      },
+      {
+        "code": "320.50",
+        "description": "No.5 Main Generator Engine (Port Outer)",
+        "count": 17
+      },
+      {
+        "code": "233.10",
+        "description": "Cargo Valve Hydraulic System",
+        "count": 15
+      },
+      {
+        "code": "320.40",
+        "description": "No.4 Main Generator Engine (Port Inner)",
+        "count": 15
+      },
+      {
+        "code": "580.10",
+        "description": "Incinerator",
+        "count": 14
+      }
+    ],
+    "done_by": {
+      "Cargo Eng": 5003,
+      "2nd Eng": 4547,
+      "4th Eng": 3943,
+      "3rd Eng": 3240,
+      "Elect": 2981,
+      "Chief Off": 1978,
+      "3rd Off": 1735,
+      "Chief Eng": 1462
+    }
+  },
+  "LNG Port Harcourt II": {
+    "total_records": 26238,
+    "planned_count": 24923,
+    "adhoc_count": 1315,
+    "by_year": {
+      "2020": 4100,
+      "2021": 3990,
+      "2022": 4118,
+      "2023": 4190,
+      "2024": 4887,
+      "2025": 4279,
+      "2026": 674
+    },
+    "failure_hotspots": [
+      {
+        "code": "320.20",
+        "description": "No.2 Main Generator Engine",
+        "count": 24
+      },
+      {
+        "code": "320.30",
+        "description": "No.3 Main Generator Engine",
+        "count": 21
+      },
+      {
+        "code": "320.40",
+        "description": "No.4 Main Generator Engine",
+        "count": 20
+      },
+      {
+        "code": "906.10",
+        "description": "Gas Detection System - Control",
+        "count": 20
+      },
+      {
+        "code": "233.10",
+        "description": "Cargo Valve Hydraulic System",
+        "count": 16
+      },
+      {
+        "code": "535.41",
+        "description": "No.4 G/S & Control Air Compressor",
+        "count": 15
+      },
+      {
+        "code": "843.20",
+        "description": "Propulsion Power Converter Controls",
+        "count": 15
+      },
+      {
+        "code": "320.10",
+        "description": "No.1 Main Generator Engine",
+        "count": 14
+      },
+      {
+        "code": "535.11",
+        "description": "No.1 G/S & Control Air Compressor",
+        "count": 14
+      },
+      {
+        "code": "320.50",
+        "description": "No.5 Main Generator Engine",
+        "count": 13
+      }
+    ],
+    "done_by": {
+      "Cargo Eng": 5333,
+      "2nd Eng": 4978,
+      "Elect": 3557,
+      "4th Eng": 3169,
+      "3rd Eng": 3154,
+      "Chief Off": 2719,
+      "3rd Off": 1449,
+      "2nd Off": 1090
+    }
+  },
+  "LPG Alfred": {
+    "total_records": 11525,
+    "planned_count": 11079,
+    "adhoc_count": 446,
+    "by_year": {
+      "2020": 1102,
+      "2021": 1909,
+      "2022": 2030,
+      "2023": 2028,
+      "2024": 2113,
+      "2025": 2069,
+      "2026": 274
+    },
+    "failure_hotspots": [
+      {
+        "code": "320.11",
+        "description": "Main Engine -",
+        "count": 16
+      },
+      {
+        "code": "350.10",
+        "description": "No.1 Main Generator Engine (Stb'd)",
+        "count": 14
+      },
+      {
+        "code": "350.17",
+        "description": "No.1 MGE - Lube Oil System",
+        "count": 14
+      },
+      {
+        "code": "625.31",
+        "description": "No.1 Central Fresh Water Cooler (Outer)",
+        "count": 10
+      },
+      {
+        "code": "350.20",
+        "description": "No.2 Main Generator Engine (Centre)",
+        "count": 9
+      },
+      {
+        "code": "350.27",
+        "description": "No.2 MGE - Lube Oil System",
+        "count": 9
+      },
+      {
+        "code": "350.37",
+        "description": "No.3 MGE - Lube Oil System",
+        "count": 9
+      },
+      {
+        "code": "350.30",
+        "description": "No.3 Main Generator Engine (Port)",
+        "count": 8
+      },
+      {
+        "code": "570.11",
+        "description": "No.1 H.F.O. Purifier",
+        "count": 8
+      },
+      {
+        "code": "253.11",
+        "description": "Inert Gas Generator",
+        "count": 7
+      }
+    ],
+    "done_by": {
+      "3rd Eng": 2083,
+      "2nd Eng": 2008,
+      "4th Eng": 1773,
+      "Elect": 1687,
+      "Chief Off": 1297,
+      "3rd Off": 1199,
+      "Chief Eng": 741,
+      "2nd Off": 706
+    }
+  }
+}

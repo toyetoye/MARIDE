@@ -1,0 +1,2304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FORCAP — Custodian</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Barlow+Condensed:wght@700;900&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg: #0a0d14;
+  --surface: #111520;
+  --surface2: #181e2e;
+  --surface3: #1e2638;
+  --border: #252e44;
+  --border-light: #303d5a;
+  --amber: #f5a623;
+  --amber-dim: #b87410;
+  --amber-glow: rgba(245,166,35,0.1);
+  --amber-glow2: rgba(245,166,35,0.06);
+  --red: #e05252;
+  --red-glow: rgba(224,82,82,0.1);
+  --green: #3db87a;
+  --green-glow: rgba(61,184,122,0.1);
+  --blue: #4a90d9;
+  --blue-glow: rgba(74,144,217,0.1);
+  --cyan: #00c9c8;
+  --text: #b8c8e0;
+  --text-dim: #5a6e90;
+  --text-bright: #e8f0ff;
+  --mono: 'Share Tech Mono', monospace;
+  --sans: 'Barlow', sans-serif;
+  --cond: 'Barlow Condensed', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; overflow: hidden; }
+
+/* ── HEADER ── */
+.app-header {
+  height: 52px; background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; flex-shrink: 0; z-index: 100; position: relative;
+}
+.logo-wrap { display: flex; align-items: center; gap: 12px; }
+.logo-box {
+  width: 36px; height: 36px; background: var(--amber-glow2);
+  border: 1px solid rgba(245,166,35,0.4); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--amber);
+}
+.logo-title { font-family: var(--cond); font-size: 18px; font-weight: 900; color: var(--text-bright); letter-spacing: 1px; }
+.logo-sub { font-family: var(--mono); font-size: 8px; color: var(--text-dim); letter-spacing: 2px; }
+.user-pill {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  background: var(--surface2); border: 1px solid var(--border);
+  padding: 4px 12px; border-radius: 20px;
+}
+.logout-btn {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px;
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim); padding: 5px 12px; border-radius: 4px; cursor: pointer;
+}
+.logout-btn:hover { color: var(--text); border-color: var(--border-light); }
+
+/* ── APP SHELL ── */
+.app-shell { display: flex; flex-direction: column; height: 100vh; }
+.app-body  { flex: 1; overflow: hidden; position: relative; }
+
+/* Override fixed positioning — fill the app-body instead */
+.cust-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  top: 0 !important;
+}
+
+/* ── LOGIN ── */
+#loginScreen {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center; z-index: 9999;
+}
+.login-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 40px 48px; width: 380px;
+}
+.login-logo { font-family: var(--cond); font-size: 28px; font-weight: 900; color: var(--amber); margin-bottom: 4px; }
+.login-sub  { font-family: var(--mono); font-size: 9px; color: var(--text-dim); letter-spacing: 2px; margin-bottom: 32px; }
+.login-field { margin-bottom: 16px; }
+.login-field label { font-family: var(--mono); font-size: 10px; color: var(--text-dim); letter-spacing: 1px; display: block; margin-bottom: 6px; }
+.login-field input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 10px 14px; color: var(--text);
+  font-family: var(--mono); font-size: 12px; outline: none;
+}
+.login-field input:focus { border-color: var(--amber); }
+.login-btn {
+  width: 100%; background: var(--amber); color: #000;
+  font-family: var(--cond); font-size: 14px; font-weight: 700; letter-spacing: 2px;
+  border: none; border-radius: 6px; padding: 12px; cursor: pointer; margin-top: 8px;
+}
+.login-btn:hover { background: #f0a500; }
+.login-error { font-family: var(--mono); font-size: 10px; color: var(--red); margin-top: 8px; min-height: 16px; }
+
+/* ── TOAST ── */
+#toastEl {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--surface2); border: 1px solid var(--border-light);
+  color: var(--text); font-family: var(--mono); font-size: 11px;
+  padding: 8px 20px; border-radius: 6px; z-index: 9999;
+  opacity: 0; transition: opacity 0.2s; pointer-events: none;
+}
+#toastEl.show { opacity: 1; }
+
+/* Shared button utilities */
+.btn-sm { font-family:var(--mono);font-size:10px;letter-spacing:1px;padding:5px 12px;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text-dim);transition:all .12s; }
+.btn-sm:hover { color:var(--text);border-color:var(--border-light); }
+.btn-sm-primary { background:var(--amber);color:#000;border-color:var(--amber);font-weight:700; }
+.btn-sm-primary:hover { background:#f0a500; }
+.btn-sm-ghost { background:transparent;color:var(--text-dim);border-color:var(--border); }
+.btn-sm-danger { background:rgba(224,82,82,.1);color:var(--red);border-color:rgba(224,82,82,.3); }
+.badge { display:inline-block;padding:2px 7px;border-radius:3px;font-family:var(--mono);font-size:9px;letter-spacing:1px; }
+.badge-green { background:rgba(61,184,122,.12);color:var(--green); }
+.badge-amber { background:rgba(245,166,35,.12);color:var(--amber); }
+.badge-red   { background:rgba(224,82,82,.12);color:var(--red); }
+select, input[type=text], input[type=email], input[type=password], textarea {
+  background:var(--surface2);border:1px solid var(--border);border-radius:4px;
+  color:var(--text);font-family:var(--mono);font-size:11px;padding:6px 10px;outline:none;
+}
+select:focus, input:focus, textarea:focus { border-color:var(--amber); }
+
+/* ── CUSTODIAN MODULE ── */
+.cust-overlay {
+  position: fixed; inset: 52px 0 0 0;
+  background: var(--bg); z-index: 90;
+  display: none; flex-direction: column;
+}
+.cust-overlay.open { display: flex; }
+
+.cust-sidebar {
+  width: 200px; flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 16px 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.cust-nav-item {
+  padding: 10px 20px;
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--text-dim); cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: all 0.12s;
+}
+.cust-nav-item:hover { color: var(--text); background: var(--surface2); }
+.cust-nav-item.active { color: var(--amber); border-left-color: var(--amber); background: var(--amber-glow); }
+.cust-nav-badge {
+  float: right; background: var(--red);
+  color: #fff; font-size: 9px; padding: 1px 5px;
+  border-radius: 10px; font-weight: 700;
+}
+
+.cust-body { flex: 1; overflow-y: auto; padding: 24px 28px; }
+.cust-section { display: none; }
+.cust-section.active { display: block; }
+
+.cust-header-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px;
+}
+.cust-title { font-family: var(--cond); font-size: 22px; font-weight: 900; color: var(--text-bright); }
+
+/* Score cards */
+.score-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 14px; margin-bottom: 24px; }
+.score-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 18px 20px;
+  position: relative; overflow: hidden;
+}
+.score-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.score-card.rag-green::before { background: var(--green); }
+.score-card.rag-amber::before { background: var(--amber); }
+.score-card.rag-red::before   { background: var(--red); }
+.score-val { font-family: var(--mono); font-size: 42px; font-weight: 700; line-height: 1; }
+.score-card.rag-green .score-val { color: var(--green); }
+.score-card.rag-amber .score-val { color: var(--amber); }
+.score-card.rag-red   .score-val { color: var(--red); }
+.score-name { font-size: 13px; font-weight: 600; color: var(--text-bright); margin: 6px 0 2px; }
+.score-role { font-family: var(--mono); font-size: 9px; color: var(--text-dim); letter-spacing: 1px; }
+.score-breakdown { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
+.score-row { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-dim); }
+.score-row span:last-child { font-family: var(--mono); color: var(--text); }
+.appraisal-weight {
+  font-family: var(--mono); font-size: 9px; color: var(--amber);
+  margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border);
+}
+
+/* Equipment registry */
+.eq-category { margin-bottom: 24px; }
+.eq-cat-label {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
+  color: var(--amber); text-transform: uppercase;
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.eq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: 8px; }
+.eq-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 6px;
+  transition: border-color 0.12s;
+  cursor: pointer;
+}
+.eq-card:hover { border-color: var(--border-light); }
+.eq-card.status-fault { border-left: 3px solid var(--red); }
+.eq-card.status-degraded { border-left: 3px solid var(--amber); }
+.eq-card.status-operational { border-left: 3px solid var(--green); }
+.eq-name { font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.eq-custodian { font-size: 11px; color: var(--text-dim); }
+.eq-custodian strong { color: var(--text); }
+.eq-status-badge {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
+  padding: 2px 7px; border-radius: 2px; align-self: flex-start;
+}
+.eq-status-badge.operational { background: rgba(61,184,122,0.12); color: var(--green); }
+.eq-status-badge.fault       { background: rgba(224,82,82,0.12); color: var(--red); }
+.eq-status-badge.degraded    { background: rgba(245,166,35,0.12); color: var(--amber); }
+.eq-status-badge.offline     { background: rgba(90,106,130,0.2); color: var(--text-dim); }
+.eq-pm { font-family: var(--mono); font-size: 9px; color: var(--text-dim); }
+.eq-pm.overdue { color: var(--red); }
+
+/* My Equipment — officer personal view */
+.my-eq-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 10px;
+  transition: border-color 0.15s;
+}
+.my-eq-card.status-fault     { border-left: 3px solid var(--red); }
+.my-eq-card.status-degraded  { border-left: 3px solid var(--amber); }
+.my-eq-card.status-operational { border-left: 3px solid var(--green); }
+.my-eq-card.status-offline   { border-left: 3px solid var(--text-dim); }
+
+.my-eq-name { font-size: 15px; font-weight: 700; color: var(--text-bright); margin-bottom: 3px; }
+.my-eq-cat  { font-family: var(--mono); font-size: 9px; color: var(--amber); letter-spacing: 1.5px; margin-bottom: 12px; }
+
+.my-eq-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+.status-toggle { display: flex; gap: 4px; margin-bottom: 10px; }
+.st-btn {
+  padding: 5px 12px; border-radius: 3px; border: 1px solid var(--border-light);
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px; cursor: pointer;
+  background: var(--surface2); color: var(--text-dim); transition: all 0.12s;
+}
+.st-btn:hover { border-color: var(--border-light); color: var(--text); }
+.st-btn.sel-operational { background: rgba(61,184,122,0.15); color: var(--green); border-color: var(--green); }
+.st-btn.sel-degraded    { background: rgba(245,166,35,0.15); color: var(--amber); border-color: var(--amber); }
+.st-btn.sel-fault       { background: rgba(224,82,82,0.15);  color: var(--red);   border-color: var(--red); }
+.st-btn.sel-offline     { background: rgba(90,106,130,0.2);  color: var(--text-dim); border-color: var(--text-dim); }
+
+/* Spare parts */
+.spare-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; background: var(--surface2);
+  border-radius: 4px; margin-bottom: 5px; font-size: 11px;
+}
+.spare-status-badge {
+  font-family: var(--mono); font-size: 8px; padding: 2px 7px;
+  border-radius: 2px; flex-shrink: 0;
+}
+.spare-status-badge.pending  { background: rgba(245,166,35,0.15); color: var(--amber); }
+.spare-status-badge.ordered  { background: rgba(74,144,217,0.15); color: #4a90d9; }
+.spare-status-badge.received { background: rgba(61,184,122,0.15); color: var(--green); }
+
+/* Supervisor overview table */
+.officer-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px;
+  cursor: pointer; transition: border-color 0.12s;
+}
+.officer-row:hover { border-color: var(--border-light); }
+.officer-name-col { width: 160px; flex-shrink: 0; }
+.officer-name { font-size: 13px; font-weight: 600; color: var(--text-bright); }
+.officer-role-lbl { font-family: var(--mono); font-size: 9px; color: var(--text-dim); }
+.eq-mini-grid { display: flex; gap: 5px; flex-wrap: wrap; flex: 1; }
+.eq-mini {
+  padding: 3px 8px; border-radius: 3px; font-size: 10px;
+  border: 1px solid var(--border); cursor: pointer;
+  transition: all 0.1s; white-space: nowrap;
+}
+.eq-mini.operational { background: rgba(61,184,122,0.08);  color: var(--green);    border-color: rgba(61,184,122,0.3); }
+.eq-mini.degraded    { background: rgba(245,166,35,0.08);  color: var(--amber);    border-color: rgba(245,166,35,0.3); }
+.eq-mini.fault       { background: rgba(224,82,82,0.08);   color: var(--red);      border-color: rgba(224,82,82,0.3); }
+.eq-mini.offline     { background: rgba(90,106,130,0.1);   color: var(--text-dim); border-color: var(--border); }
+.eq-mini:hover { opacity: 0.8; transform: scale(1.03); }
+
+/* Defect list */
+.defect-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 16px 20px; margin-bottom: 10px;
+  transition: border-color 0.12s;
+}
+.defect-card.open     { border-left: 3px solid var(--amber); }
+.defect-card.resolved { border-left: 3px solid var(--green); opacity: 0.7; }
+.defect-card.critical { border-left: 3px solid var(--red); }
+.defect-title { font-size: 13px; font-weight: 600; color: var(--text-bright); margin-bottom: 4px; }
+.defect-meta  { font-family: var(--mono); font-size: 9px; color: var(--text-dim); margin-bottom: 10px; }
+.defect-steps { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.step-item {
+  background: var(--surface2); border-radius: 4px;
+  padding: 8px 12px; font-size: 11px; color: var(--text);
+}
+.step-by { font-family: var(--mono); font-size: 9px; color: var(--text-dim); margin-top: 3px; }
+.manual-ref { color: var(--green); font-size: 9px; font-family: var(--mono); }
+
+/* Temp repairs */
+.tr-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 14px 18px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 16px;
+}
+.tr-card.overdue { border-color: rgba(224,82,82,0.4); background: rgba(224,82,82,0.03); }
+.tr-expiry {
+  font-family: var(--mono); font-size: 11px; text-align: center;
+  width: 70px; flex-shrink: 0;
+}
+.tr-expiry.overdue { color: var(--red); }
+.tr-expiry.warning { color: var(--amber); }
+.tr-expiry.ok      { color: var(--green); }
+
+/* Handover */
+.ho-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 18px 22px; margin-bottom: 10px;
+}
+.ho-signed { border-left: 3px solid var(--green); }
+.ho-pending { border-left: 3px solid var(--amber); }
+
+/* Alarm */
+.alarm-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px 16px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 14px;
+}
+.alarm-card.overdue-wo { border-left: 3px solid var(--red); }
+.alarm-card.has-wo     { border-left: 3px solid var(--green); }
+.alarm-age { font-family: var(--mono); font-size: 10px; color: var(--text-dim); width: 60px; flex-shrink: 0; text-align: center; }
+
+/* Vessel selector */
+.vessel-selector {
+  display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.vessel-sel-btn {
+  padding: 6px 14px; border-radius: 4px;
+  border: 1px solid var(--border-light);
+  background: var(--surface2); color: var(--text-dim);
+  font-family: var(--mono); font-size: 10px; cursor: pointer;
+  transition: all 0.12s;
+}
+.vessel-sel-btn:hover { border-color: var(--amber); color: var(--amber); }
+.vessel-sel-btn.active { background: var(--amber); color: #000; border-color: var(--amber); font-weight: 700; }
+
+/* ── ROUNDS / CHECKLIST ── */
+.round-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.round-eq-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  position: relative;
+}
+.round-eq-card:hover { border-color: var(--border-light); }
+.round-eq-card.overdue { border-left: 3px solid var(--red); }
+.round-eq-card.due-soon { border-left: 3px solid var(--amber); }
+.round-eq-card.ok { border-left: 3px solid var(--green); }
+.round-eq-card.no-checklist { border-left: 3px solid var(--text-dim); opacity: 0.6; }
+.round-eq-name { font-size: 13px; font-weight: 700; color: var(--text-bright); margin-bottom: 3px; }
+.round-eq-cat { font-family: var(--mono); font-size: 9px; color: var(--amber); letter-spacing: 1px; margin-bottom: 10px; }
+.round-due-badge {
+  font-family: var(--mono); font-size: 9px; padding: 2px 8px;
+  border-radius: 2px; display: inline-block; margin-bottom: 8px;
+}
+.round-due-badge.overdue { background: rgba(224,82,82,0.15); color: var(--red); }
+.round-due-badge.due-soon { background: rgba(245,166,35,0.15); color: var(--amber); }
+.round-due-badge.ok { background: rgba(61,184,122,0.12); color: var(--green); }
+.round-due-badge.no-checklist { background: var(--surface2); color: var(--text-dim); }
+.round-last-score {
+  font-family: var(--mono); font-size: 22px; font-weight: 700;
+  line-height: 1; margin-bottom: 2px;
+}
+.round-last-score.good  { color: var(--green); }
+.round-last-score.warn  { color: var(--amber); }
+.round-last-score.poor  { color: var(--red); }
+.round-start-btn {
+  width: 100%; margin-top: 12px;
+  padding: 8px; border-radius: 4px;
+  border: 1px solid var(--amber);
+  background: var(--amber-glow); color: var(--amber);
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 1px; cursor: pointer;
+  transition: all 0.12s;
+}
+.round-start-btn:hover { background: var(--amber); color: #000; }
+
+/* Checklist round form */
+.checklist-overlay {
+  position: fixed; inset: 52px 0 0 0;
+  background: var(--bg); z-index: 200;
+  display: none; flex-direction: column;
+  overflow: hidden;
+}
+.checklist-overlay.open { display: flex; }
+.checklist-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.checklist-title { font-family: var(--cond); font-size: 20px; font-weight: 900; color: var(--text-bright); }
+.checklist-subtitle { font-family: var(--mono); font-size: 9px; color: var(--text-dim); letter-spacing: 1px; margin-top: 2px; }
+.checklist-body { flex: 1; overflow-y: auto; padding: 24px 28px; max-width: 780px; margin: 0 auto; width: 100%; }
+.checklist-footer {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0;
+}
+.check-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  transition: border-color 0.15s;
+}
+.check-card.answered-good { border-left: 3px solid var(--green); }
+.check-card.answered-bad  { border-left: 3px solid var(--red); }
+.check-card.answered-warn { border-left: 3px solid var(--amber); }
+.check-card.critical-flag { background: rgba(224,82,82,0.03); }
+.check-num {
+  font-family: var(--mono); font-size: 9px; color: var(--text-dim);
+  letter-spacing: 1px; margin-bottom: 5px;
+}
+.check-text { font-size: 13px; font-weight: 600; color: var(--text-bright); margin-bottom: 4px; }
+.check-hint { font-size: 11px; color: var(--text-dim); margin-bottom: 14px; font-style: italic; }
+.check-critical-tag {
+  display: inline-block; font-family: var(--mono); font-size: 8px;
+  color: var(--red); background: rgba(224,82,82,0.1);
+  border: 1px solid rgba(224,82,82,0.3);
+  padding: 1px 7px; border-radius: 2px; margin-bottom: 8px;
+}
+.yn-btns { display: flex; gap: 6px; }
+.yn-btn {
+  padding: 7px 20px; border-radius: 4px;
+  border: 1px solid var(--border-light);
+  font-family: var(--mono); font-size: 10px;
+  letter-spacing: 1px; cursor: pointer;
+  background: var(--surface2); color: var(--text-dim);
+  transition: all 0.12s;
+}
+.yn-btn.sel-yes { background: rgba(61,184,122,0.15); color: var(--green); border-color: var(--green); }
+.yn-btn.sel-no  { background: rgba(224,82,82,0.15);  color: var(--red);   border-color: var(--red); }
+.yn-btn.sel-na  { background: rgba(90,106,130,0.15); color: var(--text-dim); border-color: var(--text-dim); }
+.cond-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+.cond-btn {
+  padding: 6px 14px; border-radius: 4px;
+  border: 1px solid var(--border-light);
+  font-family: var(--mono); font-size: 9px;
+  letter-spacing: 1px; cursor: pointer;
+  background: var(--surface2); color: var(--text-dim);
+  transition: all 0.12s;
+}
+.cond-btn.sel-Good         { background: rgba(61,184,122,0.15); color: var(--green);    border-color: var(--green); }
+.cond-btn.sel-Satisfactory { background: rgba(74,144,217,0.15); color: #4a90d9;         border-color: #4a90d9; }
+.cond-btn.sel-Requires-Attention { background: rgba(245,166,35,0.15); color: var(--amber); border-color: var(--amber); }
+.cond-btn.sel-Critical     { background: rgba(224,82,82,0.15);  color: var(--red);      border-color: var(--red); }
+.check-notes-input {
+  margin-top: 10px; width: 100%;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 4px; padding: 8px 10px;
+  font-size: 11px; color: var(--text);
+  font-family: var(--sans); resize: vertical; min-height: 36px;
+}
+.check-notes-input:focus { outline: none; border-color: var(--amber); }
+.round-progress-bar {
+  height: 3px; background: var(--border);
+  border-radius: 2px; overflow: hidden; margin-bottom: 20px;
+}
+.round-progress-fill {
+  height: 100%; background: var(--amber);
+  border-radius: 2px; transition: width 0.3s;
+}
+.critical-blocker {
+  background: rgba(224,82,82,0.08);
+  border: 1px solid rgba(224,82,82,0.3);
+  border-radius: 6px; padding: 14px 18px;
+  margin-bottom: 16px;
+}
+.critical-blocker-title {
+  font-family: var(--mono); font-size: 9px;
+  color: var(--red); letter-spacing: 1.5px; margin-bottom: 6px;
+}
+
+/* Supervisor checklist editor */
+.check-editor-row {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px 16px; margin-bottom: 8px;
+  display: grid; grid-template-columns: 1fr auto auto auto;
+  gap: 10px; align-items: center;
+}
+.check-editor-text { font-size: 12px; color: var(--text-bright); }
+.check-editor-meta { font-family: var(--mono); font-size: 9px; color: var(--text-dim); }
+
+
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">FORCAP</div>
+    <div class="login-sub">CUSTODIAN MODULE</div>
+    <div class="login-field">
+      <label>EMAIL</label>
+      <input type="email" id="loginEmail" placeholder="your@email.com" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-field">
+      <label>PASSWORD</label>
+      <input type="password" id="loginPwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" onclick="doLogin()">SIGN IN</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div class="app-shell" id="appShell" style="display:none;">
+  <div class="app-header">
+    <div class="logo-wrap">
+      <div class="logo-box">Mδ</div>
+      <div>
+        <div class="logo-title">FORCAP <span style="color:var(--text-dim);font-size:13px;font-weight:400;"> · CUSTODIAN</span></div>
+        <div class="logo-sub">EQUIPMENT ACCOUNTABILITY &amp; SCORING</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="user-pill" id="userPill">—</div>
+      <button class="logout-btn" onclick="doLogout()">SIGN OUT</button>
+    </div>
+  </div>
+
+  <div class="app-body">
+    <!-- CUSTODIAN OVERLAY -->
+<div class="cust-overlay" style="display:flex;position:absolute;inset:0;" id="custodianOverlay">
+
+  <!-- Left sidebar navigation -->
+  <div class="cust-sidebar" id="custSidebar">
+    <div style="padding:12px 20px 16px;font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--text-dim);border-bottom:1px solid var(--border);margin-bottom:8px;">CUSTODIAN MODULE</div>
+
+    <!-- Officer view tabs (shown for ship_staff / investigator role) -->
+    <div id="custOfficerNav">
+      <div class="cust-nav-item active" onclick="switchCustTab('myequipment',this)">🔧 My Equipment</div>
+      <div class="cust-nav-item" onclick="switchCustTab('myrounds',this)">✅ My Rounds <span class="cust-nav-badge" id="roundsBadge" style="display:none">0</span></div>
+      <div class="cust-nav-item" onclick="switchCustTab('defects',this)">⚠ My Defects <span class="cust-nav-badge" id="defectBadge" style="display:none">0</span></div>
+      <div class="cust-nav-item" onclick="switchCustTab('temprepairs',this)">🔩 Temp Repairs <span class="cust-nav-badge" id="trBadge" style="display:none">0</span></div>
+      <div class="cust-nav-item" onclick="switchCustTab('alarms',this)">🔔 Alarms <span class="cust-nav-badge" id="alarmBadge" style="display:none">0</span></div>
+      <div class="cust-nav-item" onclick="switchCustTab('handovers',this)">📋 Handovers</div>
+    </div>
+
+    <!-- Supervisor view tabs (shown for superintendent/admin/CE/Master) -->
+    <div id="custSuperNav" style="display:none;">
+      <div class="cust-nav-item active" onclick="switchCustTab('overview',this)">👁 Fleet Overview</div>
+      <div class="cust-nav-item" onclick="switchCustTab('scores',this)">📊 Custodian Scores</div>
+      <div class="cust-nav-item" onclick="switchCustTab('registry',this)">🔧 Equipment Registry</div>
+      <div class="cust-nav-item" onclick="switchCustTab('defects',this)">⚠ Defect Log <span class="cust-nav-badge" id="defectBadgeS" style="display:none">0</span></div>
+      <div class="cust-nav-item" onclick="switchCustTab('temprepairs',this)">🔩 Temp Repairs <span class="cust-nav-badge" id="trBadgeS" style="display:none">0</span></div>
+      <div class="cust-nav-item" onclick="switchCustTab('alarms',this)">🔔 Alarm Log <span class="cust-nav-badge" id="alarmBadgeS" style="display:none">0</span></div>
+      <div class="cust-nav-item" onclick="switchCustTab('allrounds',this)">✅ Rounds <span class="cust-nav-badge" id="roundsBadgeS" style="display:none">0</span></div>
+      <div class="cust-nav-item" onclick="switchCustTab('checklists',this)">📝 Checklists</div>
+      <div class="cust-nav-item" onclick="switchCustTab('handovers',this)">📋 Handovers</div>
+    </div>
+
+    <!-- CE/Master extra tabs — vessel visibility without full admin -->
+    <div id="custCEExtras" style="display:none;border-top:1px solid var(--border);margin-top:4px;padding-top:4px;">
+      <div class="cust-nav-item" onclick="switchCustTab('overview',this)">👁 Fleet Overview</div>
+      <div class="cust-nav-item" onclick="switchCustTab('scores',this)">📊 Scores</div>
+      <div class="cust-nav-item" onclick="switchCustTab('allrounds',this)">✅ All Rounds</div>
+      <div class="cust-nav-item" onclick="switchCustTab('handovers',this)">📋 Handovers</div>
+    </div>
+
+    <div style="flex:1;"></div>
+    <div class="cust-nav-item" onclick="switchCustTab('crewchange',this)" style="border-top:1px solid var(--border);margin-top:8px;">👥 Crew Change</div>
+    <div style="padding:10px 20px;font-family:var(--mono);font-size:8px;color:var(--text-dim);">
+      SCORE CARRIES 75% APPRAISAL WEIGHT
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="cust-body">
+
+    <!-- Vessel selector -->
+    <div class="vessel-selector" id="custVesselSelector"></div>
+
+    <!-- MY EQUIPMENT (officer view) -->
+    <div class="cust-section active" id="csec-myequipment">
+      <div class="cust-header-row">
+        <div>
+          <div class="cust-title">MY EQUIPMENT</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px;" id="myEqSubtitle">Equipment assigned to you</div>
+        </div>
+      </div>
+      <div id="myEquipmentContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Loading your equipment…</div></div>
+    </div>
+
+    <!-- OVERVIEW (supervisor view) -->
+    <div class="cust-section" id="csec-overview">
+      <div class="cust-header-row">
+        <div class="cust-title">FLEET OVERVIEW</div>
+        <button class="btn-sm btn-sm-ghost" onclick="loadFleetOverview()">↻ REFRESH</button>
+      </div>
+      <div id="overviewContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Select a vessel above</div></div>
+    </div>
+
+    <!-- SCORES -->
+    <div class="cust-section" id="csec-scores">
+      <div class="cust-header-row">
+        <div class="cust-title">CUSTODIAN SCORES</div>
+        <button class="btn-sm btn-sm-primary" onclick="loadCustodianScores()">↻ REFRESH</button>
+      </div>
+      <div id="scoresContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Select a vessel to load scores</div></div>
+    </div>
+
+    <!-- EQUIPMENT REGISTRY -->
+    <div class="cust-section" id="csec-registry">
+      <div class="cust-header-row">
+        <div class="cust-title">EQUIPMENT REGISTRY</div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-sm btn-sm-ghost" onclick="seedEquipment()">⚡ SEED DEFAULT EQUIPMENT</button>
+          <button class="btn-sm btn-sm-primary" onclick="openEqModal()">+ ADD EQUIPMENT</button>
+        </div>
+      </div>
+      <div id="registryContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Select a vessel above</div></div>
+    </div>
+
+    <!-- DEFECT LOG -->
+    <div class="cust-section" id="csec-defects">
+      <div class="cust-header-row">
+        <div class="cust-title">DEFECT LOG</div>
+        <button class="btn-sm btn-sm-primary" onclick="openDefectModal()">+ RAISE DEFECT</button>
+      </div>
+      <div id="defectsContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Select a vessel above</div></div>
+    </div>
+
+    <!-- TEMP REPAIRS -->
+    <div class="cust-section" id="csec-temprepairs">
+      <div class="cust-header-row">
+        <div class="cust-title">TEMPORARY REPAIR REGISTER</div>
+        <button class="btn-sm btn-sm-primary" onclick="openTrModal()">+ LOG TEMP REPAIR</button>
+      </div>
+      <div id="trContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Select a vessel above</div></div>
+    </div>
+
+    <!-- ALARM LOG -->
+    <div class="cust-section" id="csec-alarms">
+      <div class="cust-header-row">
+        <div class="cust-title">ALARM CLEARANCE LOG</div>
+        <button class="btn-sm btn-sm-primary" onclick="openAlarmModal()">+ LOG ALARM</button>
+      </div>
+      <div style="background:rgba(245,166,35,0.06);border:1px solid rgba(245,166,35,0.2);border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:var(--text-dim);">
+        ⚠ 24-hour rule: Any muted alarm must have a Work Order reference within 24 hours or it will be flagged as a discipline failure and deducted from the custodian score.
+      </div>
+      <div id="alarmsContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Select a vessel above</div></div>
+    </div>
+
+    <!-- MY ROUNDS (officer) -->
+    <div class="cust-section" id="csec-myrounds">
+      <div class="cust-header-row">
+        <div>
+          <div class="cust-title">MY ROUNDS</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px;">Equipment inspection rounds — due every 14 days</div>
+        </div>
+        <button class="btn-sm btn-sm-ghost" onclick="loadMyRounds()">↻ REFRESH</button>
+      </div>
+      <div id="myRoundsContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Loading…</div></div>
+    </div>
+
+    <!-- ALL ROUNDS (supervisor) -->
+    <div class="cust-section" id="csec-allrounds">
+      <div class="cust-header-row">
+        <div class="cust-title">ALL ROUNDS</div>
+        <button class="btn-sm btn-sm-ghost" onclick="loadAllRounds()">↻ REFRESH</button>
+      </div>
+      <div id="allRoundsContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Select a vessel above</div></div>
+    </div>
+
+    <!-- CHECKLISTS (supervisor editor) -->
+    <div class="cust-section" id="csec-checklists">
+      <div class="cust-header-row">
+        <div>
+          <div class="cust-title">CHECKLIST TEMPLATES</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px;">AI-generated, superintendent-editable</div>
+        </div>
+      </div>
+      <div id="checklistsContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Select a vessel above</div></div>
+    </div>
+
+    <!-- CREW CHANGE -->
+    <div class="cust-section" id="csec-crewchange">
+      <div class="cust-header-row">
+        <div>
+          <div class="cust-title">CREW CHANGE</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px;">Manage sign-on / sign-off and handovers</div>
+        </div>
+      </div>
+      <div id="crewChangeContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Loading…</div></div>
+    </div>
+
+    <!-- HANDOVERS -->
+    <div class="cust-section" id="csec-handovers">
+      <div class="cust-header-row">
+        <div>
+          <div class="cust-title">HANDOVER LOG</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px;">All handover notes for this vessel</div>
+        </div>
+        <div style="display:flex;gap:8px;" id="hoHeaderBtns">
+          <button class="btn-sm btn-sm-ghost" onclick="loadHandovers()">↻ Refresh</button>
+          <button class="btn-sm btn-sm-primary" id="hoNewBtn" style="display:none;" onclick="openHandoverModal()">+ NEW HANDOVER</button>
+        </div>
+      </div>
+      <div id="handoversContent"><div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">Select a vessel above</div></div>
+    </div>
+
+  </div>
+</div>
+    <!-- SCORE DETAIL PANEL -->
+<div class="score-detail-panel" id="scoreDetailPanel">
+  <div class="score-detail-header">
+    <button class="btn-sm btn-sm-ghost" onclick="closeScoreDetail()" style="font-size:18px;padding:2px 10px;">←</button>
+    <div>
+      <div style="font-family:var(--cond);font-size:22px;font-weight:900;color:var(--text-bright);" id="sdpTitle">CUSTODIAN DETAIL</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:2px;" id="sdpSubtitle"></div>
+    </div>
+    <div style="margin-left:auto;text-align:right;">
+      <div style="font-family:var(--mono);font-size:42px;font-weight:700;line-height:1;" id="sdpScore"></div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">/ 100 · CUSTODIAN SCORE</div>
+    </div>
+  </div>
+  <div class="score-detail-body" id="scoreDetailBody">
+    <div style="font-family:var(--mono);font-size:11px;color:var(--amber);">Loading…</div>
+  </div>
+</div>
+    <!-- CHECKLIST ROUND OVERLAY -->
+<div class="checklist-overlay" id="checklistOverlay">
+  <div class="checklist-header">
+    <div>
+      <div class="checklist-title" id="clOverlayTitle">EQUIPMENT ROUND</div>
+      <div class="checklist-subtitle" id="clOverlaySubtitle">LOADING…</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div style="text-align:right;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">PROGRESS</div>
+        <div style="font-family:var(--mono);font-size:14px;color:var(--amber);" id="clProgress">0 / 0</div>
+      </div>
+      <button class="btn-sm btn-sm-ghost" onclick="closeChecklistOverlay()">✕ CLOSE</button>
+    </div>
+  </div>
+  <div class="checklist-body">
+    <div class="round-progress-bar"><div class="round-progress-fill" id="clProgressBar" style="width:0%"></div></div>
+    <div id="clCriticalBlockers" style="display:none;" class="critical-blocker">
+      <div class="critical-blocker-title">🚨 CRITICAL FINDINGS — SUBMISSION BLOCKED</div>
+      <div id="clBlockerList" style="font-size:12px;color:var(--red);"></div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:8px;">These findings must be escalated to your Chief Engineer / Superintendent before you can submit this round.</div>
+      <div style="margin-top:10px;"><label style="font-size:11px;color:var(--text-dim);">Escalation reference / confirmation:</label>
+        <input id="clEscalationRef" placeholder="e.g. Reported to CE at 14:30 — WO raised" style="margin-top:4px;font-size:12px;"></div>
+    </div>
+    <div id="clChecksContainer"></div>
+  </div>
+  <div class="checklist-footer">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);" id="clFooterStatus"></div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-sm btn-sm-ghost" onclick="saveRoundDraft()">💾 SAVE DRAFT</button>
+      <button class="btn-sm btn-sm-primary" id="clSubmitBtn" onclick="submitRound()">SUBMIT ROUND →</button>
+    </div>
+  </div>
+</div>
+  </div>
+</div>
+
+<div id="toastEl"></div>
+
+<script>
+// ── Config ─────────────────────────────────────────────
+const API_BASE = 'https://maride.onrender.com';
+
+// ── Auth ───────────────────────────────────────────────
+function getToken() { return localStorage.getItem('forcap_token') || ''; }
+function getUser()  {
+  try { return JSON.parse(atob(getToken().split('.')[1] || '')); }
+  catch(e) { return null; }
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd   = document.getElementById('loginPwd').value;
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+  if (!email || !pwd) { errEl.textContent = 'Enter email and password.'; return; }
+  try {
+    const res  = await fetch(API_BASE + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pwd })
+    });
+    const data = await res.json();
+    if (!res.ok) { errEl.textContent = data.error || 'Login failed'; return; }
+    localStorage.setItem('forcap_token', data.token);
+    initApp();
+  } catch(e) { errEl.textContent = 'Cannot reach server.'; }
+}
+
+function doLogout() {
+  localStorage.removeItem('forcap_token');
+  document.getElementById('appShell').style.display   = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+function initApp() {
+  if (!getToken()) return;
+  const user = getUser();
+  if (!user) { doLogout(); return; }
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appShell').style.display    = 'flex';
+  document.getElementById('userPill').textContent =
+    (user.name || user.email || 'User') + ' · ' + (user.role || '').toUpperCase();
+  loadCustodianVessels();
+}
+
+// ── Toast ──────────────────────────────────────────────
+let _toastTimer;
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ── Fetch interceptor: prepend API_BASE + inject token ─
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(url, opts = {}) {
+  if (typeof url === 'string' && url.startsWith('/api/')) url = API_BASE + url;
+  const token = getToken();
+  if (token) {
+    opts.headers = opts.headers || {};
+    if (!opts.headers['x-auth-token']) opts.headers['x-auth-token'] = token;
+  }
+  return _origFetch(url, opts);
+};
+
+// ── Custodian module ───────────────────────────────────
+function isCustSupervisor() {
+  const u = getCurrentUser();
+  if (!u) return false;
+  if (['superintendent','admin','fleet_manager','deputy_fleet_manager'].includes(u.role)) return true;
+  // Match CE, C/E, Chief Engineer, Chief Eng, Master, Captain and other abbreviations
+  const d = (u.designation || '').toLowerCase().trim();
+  return ['chief engineer','ce','c/e','chief eng','c.e.','master','captain'].includes(d);
+}
+
+function normaliseDesignation(raw) {
+  const map = {
+    'ce':'Chief Engineer', 'c/e':'Chief Engineer', 'chief eng':'Chief Engineer', 'c.e.':'Chief Engineer',
+    'captain':'Master',
+    '2e':'2nd Engineer', '2/e':'2nd Engineer',
+    '3e':'3rd Engineer', '3/e':'3rd Engineer',
+    '4e':'4th Engineer', '4/e':'4th Engineer',
+    'c/o':'Chief Officer', 'chief off':'Chief Officer',
+    '2/o':'2nd Officer', '3/o':'3rd Officer',
+  };
+  const key = (raw||'').toLowerCase().trim();
+  return map[key] || raw;
+}
+
+function switchCustTab(tab, el) {
+  document.querySelectorAll('.cust-nav-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.cust-section').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('csec-' + tab).classList.add('active');
+  loadCustTab(tab);
+}
+
+async function loadCustodianVessels() {
+  try {
+    // Nav visibility rules:
+    // superintendent / admin  → supervisor nav only (full fleet view)
+    // CE / Master             → officer nav + extra Fleet Overview tab
+    // All other officers      → officer nav only (clean, personal)
+    const u = getCurrentUser();
+    const isFullSuper = ['superintendent','admin','fleet_manager','deputy_fleet_manager'].includes(u?.role);
+    const isCEorMaster = !isFullSuper && isCustSupervisor();
+    const isOfficer = !isFullSuper;
+
+    const isVesselSuper = isFullSuper || isCEorMaster;  // CE/Master get full supervisor view
+
+    document.getElementById('custOfficerNav').style.display = !isVesselSuper ? 'block' : 'none';
+    document.getElementById('custSuperNav').style.display   = isVesselSuper  ? 'block' : 'none';
+
+    // CE extras now unused — hide it
+    const ceExtras = document.getElementById('custCEExtras');
+    if (ceExtras) ceExtras.style.display = 'none';
+
+    // Reset active tab
+    document.querySelectorAll('.cust-nav-item').forEach(i => i.classList.remove('active'));
+    const firstTab  = isVesselSuper ? 'overview' : 'myequipment';
+    const firstNavId = isVesselSuper ? 'custSuperNav' : 'custOfficerNav';
+    document.querySelectorAll(`#${firstNavId} .cust-nav-item`)[0]?.classList.add('active');
+    document.querySelectorAll('.cust-section').forEach(s => s.classList.remove('active'));
+    document.getElementById('csec-' + firstTab)?.classList.add('active');
+
+    const res = await fetch('/api/vessels', { headers: { 'x-auth-token': getToken() } });
+    const vessels = await res.json();
+    const sel = document.getElementById('custVesselSelector');
+
+    // Officers: only show vessel selector if they have multiple vessels, or auto-select
+    if (!vessels.length) {
+      sel.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);">No vessels registered</div>';
+      return;
+    }
+
+    sel.innerHTML = vessels.map((v,i) =>
+      `<button class="vessel-sel-btn ${i===0?'active':''}" onclick="selectCustVessel('${v.id}','${v.name}',this)">${v.name}</button>`
+    ).join('');
+    selectCustVessel(vessels[0].id, vessels[0].name, sel.querySelector('.vessel-sel-btn'));
+  } catch(e) { console.error(e); }
+}
+
+function selectCustVessel(id, name, btn) {
+  custVesselId = id;
+  document.querySelectorAll('.vessel-sel-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Load active section
+  const activeTab = document.querySelector('.cust-nav-item.active');
+  if (activeTab) {
+    const tab = activeTab.textContent.trim().toLowerCase().replace(/[^a-z]/g,'').replace('scores','scores').replace('equipmentregistry','registry').replace('defectlog','defects').replace('temprepairs','temprepairs').replace('alarmlog','alarms').replace('handovers','handovers');
+    loadCustTab(activeTab.onclick.toString().match(/'([^']+)'/)?.[1] || 'scores');
+  }
+}
+
+function loadCustTab(tab) {
+  if (!custVesselId) return;
+  switch(tab) {
+    case 'myequipment': loadMyEquipment(); break;
+    case 'overview':    loadFleetOverview(); break;
+    case 'scores':      loadCustodianScores(); break;
+    case 'registry':    loadEquipmentRegistry(); break;
+    case 'defects':     loadDefects(); break;
+    case 'temprepairs': loadTempRepairs(); break;
+    case 'alarms':      loadAlarms(); break;
+    case 'handovers':   loadHandovers(); break;
+    case 'myrounds':    loadMyRounds(); break;
+    case 'allrounds':   loadAllRounds(); break;
+    case 'checklists':  loadChecklistTemplates(); break;
+    case 'crewchange':  loadCrewChange(); break;
+  }
+}
+
+// ── MY EQUIPMENT (officer personal view) ───────────────
+async function loadMyEquipment() {
+  if (!custVesselId) return;
+  const user = getCurrentUser();
+  const el = document.getElementById('myEquipmentContent');
+  el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);padding:10px 0;">Loading your equipment…</div>';
+  try {
+    const res = await fetch('/api/custodian/equipment?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    custEquipment = await res.json();
+    // Filter to officer's own equipment by name match
+    const myDesignation = normaliseDesignation(user?.designation || '');
+    const myName        = user?.name || '';
+    const myEq = custEquipment.filter(e =>
+      myDesignation && normaliseDesignation(e.custodian_designation||'') === myDesignation
+    );
+
+    document.getElementById('myEqSubtitle').textContent =
+      myEq.length + ' item' + (myEq.length!==1?'s':'') + ' assigned to ' + (myDesignation||myName);
+
+    if (!myEq.length) {
+      const noDesig = !myDesignation;
+      el.innerHTML = `<div style="text-align:center;padding:40px 0;">
+        <div style="font-size:32px;margin-bottom:12px;">🔧</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;">
+          ${noDesig ? 'No designation assigned to your account' : 'No equipment assigned to ' + myDesignation + ' yet'}
+        </div>
+        <div style="font-size:12px;color:var(--text-dim);">
+          ${noDesig
+            ? 'Ask your administrator to set your vessel designation (e.g. 2nd Engineer) in your user account'
+            : 'Ask your Chief Engineer or Superintendent to assign equipment to <strong style="color:var(--text);">' + myDesignation + '</strong> in the Equipment Registry'}
+        </div>
+      </div>`; return;
+    }
+
+    const now = new Date();
+    const [defRes, trRes, almRes] = await Promise.all([
+      fetch('/api/custodian/defects?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } }),
+      fetch('/api/custodian/temp-repairs?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } }),
+      fetch('/api/custodian/alarms?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } }),
+    ]);
+    const defects = await defRes.json();
+    const tempReps = await trRes.json();
+    const alarms = await almRes.json();
+
+    el.innerHTML = myEq.map(eq => {
+      const pmOverdue = eq.next_pm_date && new Date(eq.next_pm_date) < now;
+      const openDefs = defects.filter(d => d.equipment_id===eq.id && d.status==='open');
+      const openTrs  = tempReps.filter(t => t.equipment_id===eq.id && t.status!=='closed');
+      const openAlms = alarms.filter(a => a.equipment_id===eq.id && a.status==='open');
+      const spares   = (eq.spare_parts||[]);
+      const pendingSpares = spares.filter(s=>s.status!=='received');
+      const statusOpts = ['operational','degraded','fault','offline'];
+      const statusLabels = {operational:'OPERATIONAL', degraded:'DEGRADED', fault:'FAULT', offline:'OFFLINE'};
+
+      return `<div class="my-eq-card status-${eq.status||'operational'}" id="myeq_${eq.id}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div class="my-eq-name">${eq.name}</div>
+            <div class="my-eq-cat">${eq.category}</div>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            ${pmOverdue ? '<span style="font-family:var(--mono);font-size:9px;color:var(--red);background:rgba(224,82,82,0.1);padding:2px 8px;border-radius:2px;">⚠ PM OVERDUE</span>' : ''}
+            ${openDefs.length  ? `<span style="font-family:var(--mono);font-size:9px;color:var(--amber);background:rgba(245,166,35,0.1);padding:2px 8px;border-radius:2px;">${openDefs.length} DEFECT${openDefs.length>1?'S':''}</span>` : ''}
+          </div>
+        </div>
+
+        <!-- Status toggle -->
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-bottom:6px;">STATUS</div>
+        <div class="status-toggle">
+          ${statusOpts.map(s => `<button class="st-btn ${eq.status===s?'sel-'+s:''}" onclick="updateEqStatus('${eq.id}','${s}',this)">${statusLabels[s]}</button>`).join('')}
+        </div>
+
+        <!-- PM info -->
+        <div class="eq-pm ${pmOverdue?'overdue':''}" style="margin-bottom:10px;">
+          ${eq.next_pm_date ? (pmOverdue?'⚠ PM OVERDUE since ':'Next PM due: ') + eq.next_pm_date : 'No PM scheduled'}
+          ${eq.last_pm_date ? ' · Last done: ' + eq.last_pm_date : ''}
+        </div>
+
+        <!-- Open items summary -->
+        ${openTrs.length ? `<div style="font-size:11px;color:var(--amber);margin-bottom:6px;">🔩 ${openTrs.length} temp repair${openTrs.length>1?'s':''} active</div>` : ''}
+        ${openAlms.length ? `<div style="font-size:11px;color:var(--red);margin-bottom:6px;">🔔 ${openAlms.length} alarm${openAlms.length>1?'s':''} open</div>` : ''}
+
+        <!-- Spare parts -->
+        ${spares.length ? `<div style="margin-bottom:8px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-bottom:5px;">SPARE PARTS</div>
+          ${spares.map(s => `<div class="spare-row">
+            <span class="spare-status-badge ${s.status}">${s.status.toUpperCase()}</span>
+            <span style="flex:1;">${s.name}</span>
+            <button class="btn-sm btn-sm-ghost" style="padding:2px 8px;font-size:9px;" onclick="cycleSpareStatus('${eq.id}','${s.id}')">↻</button>
+          </div>`).join('')}
+        </div>` : ''}
+
+        <!-- Action buttons -->
+        <div class="my-eq-actions">
+          <button class="btn-sm btn-sm-ghost" onclick="quickLogDefect('${eq.id}','${eq.name}')">⚠ Log Defect</button>
+          <button class="btn-sm btn-sm-ghost" onclick="quickLogTr('${eq.id}','${eq.name}')">🔩 Temp Repair</button>
+          <button class="btn-sm btn-sm-ghost" onclick="quickLogAlarm('${eq.id}','${eq.name}')">🔔 Log Alarm</button>
+          <button class="btn-sm btn-sm-ghost" onclick="quickLogPm('${eq.id}','${eq.name}')">✓ Log PM</button>
+          <button class="btn-sm btn-sm-ghost" onclick="quickAddSpare('${eq.id}','${eq.name}')">📦 Add Spare</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:11px;">${e.message}</div>`; }
+}
+
+async function updateEqStatus(eqId, status, btn) {
+  try {
+    await fetch('/api/custodian/equipment/' + eqId, {
+      method:'PUT', headers:{'Content-Type':'application/json','x-auth-token':getToken()},
+      body: JSON.stringify({ status })
+    });
+    // Update button states in card
+    const card = document.getElementById('myeq_' + eqId);
+    if (card) {
+      card.className = card.className.replace(/status-\w+/, 'status-' + status);
+      card.querySelectorAll('.st-btn').forEach(b => {
+        b.className = b.className.replace(/sel-\w+/,'');
+        if (b.textContent.toLowerCase().includes(status)) b.classList.add('sel-'+status);
+      });
+    }
+    // Update custEquipment cache
+    const eq = custEquipment.find(e=>e.id===eqId);
+    if (eq) eq.status = status;
+    toast('Status updated: ' + status.toUpperCase());
+    trail('Equipment status updated: ' + status, 'amber');
+  } catch(e) { toast('Update failed: ' + e.message); }
+}
+
+async function cycleSpareStatus(eqId, spareId) {
+  const eq = custEquipment.find(e=>e.id===eqId);
+  if (!eq) return;
+  const spare = (eq.spare_parts||[]).find(s=>s.id===spareId);
+  if (!spare) return;
+  const cycle = {pending:'ordered', ordered:'received', received:'pending'};
+  spare.status = cycle[spare.status] || 'pending';
+  await fetch('/api/custodian/equipment/' + eqId, {
+    method:'PUT', headers:{'Content-Type':'application/json','x-auth-token':getToken()},
+    body: JSON.stringify({ spare_parts: eq.spare_parts })
+  });
+  loadMyEquipment();
+  toast('Spare status: ' + spare.status.toUpperCase());
+}
+
+// ── FLEET OVERVIEW (supervisor) ─────────────────────────
+async function loadFleetOverview() {
+  if (!custVesselId) return;
+  const el = document.getElementById('overviewContent');
+  el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);padding:10px 0;">Loading fleet overview…</div>';
+  try {
+    const res = await fetch('/api/custodian/equipment?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    custEquipment = await res.json();
+    const [defRes, trRes, almRes, scoreRes] = await Promise.all([
+      fetch('/api/custodian/defects?vessel_id='     + custVesselId, { headers: { 'x-auth-token': getToken() } }),
+      fetch('/api/custodian/temp-repairs?vessel_id='+ custVesselId, { headers: { 'x-auth-token': getToken() } }),
+      fetch('/api/custodian/alarms?vessel_id='      + custVesselId, { headers: { 'x-auth-token': getToken() } }),
+      fetch('/api/custodian/scores?vessel_id='      + custVesselId, { headers: { 'x-auth-token': getToken() } }),
+    ]);
+    const defects  = await defRes.json();
+    const tempReps = await trRes.json();
+    const alarms   = await almRes.json();
+    const scoreData = await scoreRes.json();
+
+    // Fetch signed-on users to show current holder of each designation
+    const usersRes = await fetch('/api/users', { headers: { 'x-auth-token': getToken() } });
+    const allUsers = usersRes.ok ? await usersRes.json() : [];
+    const signedOnByDesig = {};
+    allUsers.filter(u => u.signed_on !== false && u.designation).forEach(u => {
+      signedOnByDesig[u.designation] = u.name;
+    });
+
+    // Group equipment by designation
+    const officers = {};
+    custEquipment.forEach(eq => {
+      const key = normaliseDesignation(eq.custodian_designation || '') || '⚠ UNASSIGNED';
+      const holderName = signedOnByDesig[key] || signedOnByDesig[eq.custodian_designation||''] || '— Vacant —';
+      if (!officers[key]) officers[key] = { designation:key, holderName, equipment:[] };
+      officers[key].equipment.push(eq);
+    });
+
+    const now = new Date();
+    const faultCount   = custEquipment.filter(e=>e.status==='fault').length;
+    const degradedCount= custEquipment.filter(e=>e.status==='degraded').length;
+    const unassigned   = custEquipment.filter(e=>!e.custodian_name).length;
+    const openDefs     = defects.filter(d=>d.status==='open').length;
+    const overdueTrs   = tempReps.filter(t=>t.status==='overdue').length;
+    const overdueAlms  = alarms.filter(a=>{
+      return a.status==='open' && (now-new Date(a.created_at))/3600000 > 24 && !a.work_order_ref;
+    }).length;
+
+    el.innerHTML = `
+      <!-- Fleet health KPIs -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px;">
+        ${[
+          ['Total Equipment', custEquipment.length, 'var(--text-dim)'],
+          ['Faults', faultCount, faultCount?'var(--red)':'var(--green)'],
+          ['Degraded', degradedCount, degradedCount?'var(--amber)':'var(--green)'],
+          ['Open Defects', openDefs, openDefs?'var(--amber)':'var(--green)'],
+          ['Unassigned', unassigned, unassigned?'var(--red)':'var(--green)'],
+        ].map(([label,val,color]) => `
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px;">
+            <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:${color};line-height:1;">${val}</div>
+            <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;">${label.toUpperCase()}</div>
+          </div>`).join('')}
+      </div>
+
+      <!-- By officer -->
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--text-dim);margin-bottom:12px;">BY CUSTODIAN — CLICK ANY ITEM TO VIEW DETAILS</div>
+      ${Object.values(officers).map(officer => {
+        const score = scoreData.scores?.find(s=>s.name===officer.name);
+        const ragColor = score ? (score.rag==='green'?'var(--green)':score.rag==='amber'?'var(--amber)':'var(--red)') : 'var(--text-dim)';
+        return `<div class="officer-row">
+          <div class="officer-name-col">
+            <div class="officer-name" style="font-size:12px;">${officer.designation}</div>
+            <div style="font-size:11px;color:var(--text);margin-top:1px;">${officer.holderName}</div>
+            ${score ? `<div style="font-family:var(--mono);font-size:11px;color:${ragColor};font-weight:700;margin-top:3px;">${score.score}/100</div>` : ''}
+          </div>
+          <div class="eq-mini-grid">
+            ${officer.equipment.map(eq =>
+              `<div class="eq-mini ${eq.status||'operational'}" onclick="openEqModal('${eq.id}')" title="${eq.name} — ${eq.status||'operational'}">${eq.name}</div>`
+            ).join('')}
+          </div>
+          <div style="text-align:right;flex-shrink:0;min-width:80px;">
+            ${officer.equipment.filter(e=>e.status==='fault').length ? `<div style="font-family:var(--mono);font-size:9px;color:var(--red);">${officer.equipment.filter(e=>e.status==='fault').length} FAULT</div>` : ''}
+            ${officer.equipment.filter(e=>e.status==='degraded').length ? `<div style="font-family:var(--mono);font-size:9px;color:var(--amber);">${officer.equipment.filter(e=>e.status==='degraded').length} DEGRADED</div>` : ''}
+            ${defects.filter(d=>officer.equipment.some(e=>e.id===d.equipment_id)&&d.status==='open').length ? `<div style="font-family:var(--mono);font-size:9px;color:var(--amber);">${defects.filter(d=>officer.equipment.some(e=>e.id===d.equipment_id)&&d.status==='open').length} OPEN DEF</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    `;
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:11px;">${e.message}</div>`; }
+}
+
+// ── SCORES ──────────────────────────────────────────────
+async function loadCustodianScores() {
+  if (!custVesselId) return;
+  const el = document.getElementById('scoresContent');
+  el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);padding:10px 0;">Loading scores…</div>';
+  try {
+    const res = await fetch('/api/custodian/scores?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    const data = await res.json();
+    const scores = data.scores || [];
+    if (!scores.length) {
+      el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">No custodians assigned yet. Seed equipment in the Equipment Registry and assign designations to each item.</div>';
+      return;
+    }
+    data.scores = scores;
+    const breakdownLabels = { pms:'PMS Compliance', defects:'Defect Resolution', tempRepairs:'Temp Repair Discipline', alarms:'Alarm Clearance', health:'Equipment Health' };
+    const breakdownMax    = { pms:30, defects:25, tempRepairs:20, alarms:15, health:10 };
+
+    el.innerHTML = `
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1.5px;margin-bottom:16px;">
+        WEEK OF ${new Date().toDateString().toUpperCase()} · SCORES CARRY 75% APPRAISAL WEIGHT
+      </div>
+      <div class="score-grid">
+        ${data.scores.map(s => `
+          <div class="score-card rag-${s.rag}" onclick="openScoreDetail('${encodeURIComponent(JSON.stringify(s))}')">
+            <div class="score-val">${s.score}</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:4px;">/ 100</div>
+            <div class="score-name">${s.designation||s.name}</div>
+            <div class="score-role">${s.holder_name ? s.holder_name + ' (current)' : s.role||'—'}</div>
+            <div class="score-breakdown">
+              ${Object.entries(s.breakdown).map(([k,v]) => `
+                <div class="score-row">
+                  <span>${breakdownLabels[k]||k}</span>
+                  <span>${v} / ${breakdownMax[k]||10}</span>
+                </div>`).join('')}
+            </div>
+            <div class="appraisal-weight">
+              ${s.open_defects} open defects · ${s.overdue_temp} overdue temp repairs · ${s.equipment_count} assets
+            </div>
+          </div>`).join('')}
+      </div>`;
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-family:var(--mono);font-size:11px;">${e.message}</div>`; }
+}
+
+
+// ── SCORE DETAIL PANEL ───────────────────────────────────
+
+async function openScoreDetail(encodedScore) {
+  const s = JSON.parse(decodeURIComponent(encodedScore));
+  const panel = document.getElementById('scoreDetailPanel');
+  const ragColor = s.rag==='green'?'var(--green)':s.rag==='amber'?'var(--amber)':'var(--red)';
+
+  document.getElementById('sdpTitle').textContent = s.designation || s.name;
+  document.getElementById('sdpSubtitle').textContent = (s.holder_name ? s.holder_name + ' (current holder) · ' : '') + s.equipment_count + ' assets under custody';
+  const scoreEl = document.getElementById('sdpScore');
+  scoreEl.textContent = s.score;
+  scoreEl.style.color = ragColor;
+
+  panel.classList.add('open');
+  document.getElementById('scoreDetailBody').innerHTML =
+    '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);">Loading detail…</div>';
+
+  // Fetch all needed data in parallel
+  try {
+    const [eqRes, defRes, trRes, almRes] = await Promise.all([
+      fetch('/api/custodian/equipment?vessel_id=' + custVesselId, {headers:{'x-auth-token':getToken()}}),
+      fetch('/api/custodian/defects?vessel_id='   + custVesselId, {headers:{'x-auth-token':getToken()}}),
+      fetch('/api/custodian/temp-repairs?vessel_id='+ custVesselId, {headers:{'x-auth-token':getToken()}}),
+      fetch('/api/custodian/alarms?vessel_id='    + custVesselId, {headers:{'x-auth-token':getToken()}}),
+    ]);
+    const allEq   = await eqRes.json();
+    const allDef  = await defRes.json();
+    const allTr   = await trRes.json();
+    const allAlm  = await almRes.json();
+
+    // Filter to this custodian's designation
+    const myDesig = s.designation;
+    const eq      = allEq.filter(e => e.custodian_designation === myDesig);
+    const defects = allDef.filter(d => { const e = allEq.find(x=>x.id===d.equipment_id); return e?.custodian_designation===myDesig; });
+    const tempReps= allTr.filter(t => { const e = allEq.find(x=>x.id===t.equipment_id); return e?.custodian_designation===myDesig; });
+    const alarms  = allAlm.filter(a => { const e = allEq.find(x=>x.id===a.equipment_id); return e?.custodian_designation===myDesig; });
+
+    const now = new Date();
+    const openDef    = defects.filter(d=>d.status==='open');
+    const overduetr  = tempReps.filter(t=>t.status==='overdue');
+    const openAlarms = alarms.filter(a=>a.status==='open');
+    const pmOverdue  = eq.filter(e=>e.next_pm_date && new Date(e.next_pm_date)<now);
+    const pmDueSoon  = eq.filter(e=>e.next_pm_date && new Date(e.next_pm_date)>=now && (new Date(e.next_pm_date)-now)<30*86400000);
+
+    const breakdownLabels = { pms:'PMS Compliance', defects:'Defect Resolution', tempRepairs:'Temp Repair Discipline', alarms:'Alarm Clearance', health:'Equipment Health' };
+    const breakdownMax    = { pms:30, defects:25, tempRepairs:20, alarms:15, health:10 };
+    const breakdownColors = { pms:'#60a5fa', defects:'var(--amber)', tempRepairs:'var(--green)', alarms:'#c084fc', health:'var(--green)' };
+
+    document.getElementById('scoreDetailBody').innerHTML = `
+      <div class="score-detail-left">
+
+        <!-- Score breakdown bars -->
+        <div class="sdp-card">
+          <div class="sdp-card-title">SCORE BREAKDOWN</div>
+          ${Object.entries(s.breakdown).map(([k,v]) => {
+            const max  = breakdownMax[k] || 10;
+            const pct  = Math.round(v/max*100);
+            const col  = pct>=80 ? 'var(--green)' : pct>=50 ? 'var(--amber)' : 'var(--red)';
+            return `<div class="sdp-bar-row">
+              <div class="sdp-bar-label">${breakdownLabels[k]||k}</div>
+              <div class="sdp-bar-track">
+                <div class="sdp-bar-fill" style="width:${pct}%;background:${col};"></div>
+              </div>
+              <div class="sdp-bar-score">${v} / ${max}</div>
+            </div>`;
+          }).join('')}
+          <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">TOTAL SCORE</div>
+            <div style="font-family:var(--mono);font-size:20px;font-weight:700;color:${ragColor};">${s.score} / 100</div>
+          </div>
+        </div>
+
+        <!-- Quick stats -->
+        <div class="sdp-card">
+          <div class="sdp-card-title">AT A GLANCE</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            ${[
+              [eq.length, 'ASSETS', 'var(--text)'],
+              [openDef.length, 'OPEN DEFECTS', openDef.length>0?'var(--red)':'var(--green)'],
+              [pmOverdue.length, 'PM OVERDUE', pmOverdue.length>0?'var(--red)':'var(--green)'],
+              [pmDueSoon.length, 'PM DUE SOON', pmDueSoon.length>0?'var(--amber)':'var(--text-dim)'],
+              [overduetr.length, 'OVERDUE TEMP REPAIRS', overduetr.length>0?'var(--red)':'var(--green)'],
+              [openAlarms.length, 'OPEN ALARMS', openAlarms.length>0?'var(--amber)':'var(--green)'],
+            ].map(([v,l,c])=>`<div style="background:var(--surface2);border-radius:6px;padding:10px 12px;">
+              <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:${c};line-height:1;">${v}</div>
+              <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;">${l}</div>
+            </div>`).join('')}
+          </div>
+        </div>
+
+        <!-- Appraisal note -->
+        <div class="sdp-card" style="background:rgba(${s.rag==='green'?'61,184,122':s.rag==='amber'?'245,166,35':'224,82,82'},0.06);border-color:rgba(${s.rag==='green'?'61,184,122':s.rag==='amber'?'245,166,35':'224,82,82'},0.2);">
+          <div class="sdp-card-title" style="color:${ragColor};">APPRAISAL IMPACT</div>
+          <div style="font-size:12px;color:var(--text);line-height:1.7;">
+            This score contributes <strong>75%</strong> to the ${myDesig} appraisal for the current period.
+            ${s.score>=80
+              ? 'Performance is <strong style="color:var(--green);">excellent</strong> — meeting or exceeding all custodianship KPIs.'
+              : s.score>=60
+              ? 'Performance is <strong style="color:var(--amber);">satisfactory</strong> — some areas need attention to reach target.'
+              : 'Performance is <strong style="color:var(--red);">below standard</strong> — immediate action required on open items.'}
+          </div>
+        </div>
+      </div>
+
+      <div class="score-detail-right">
+
+        <!-- Equipment list -->
+        <div class="sdp-card">
+          <div class="sdp-card-title">${eq.length} EQUIPMENT ASSETS UNDER CUSTODY</div>
+          ${eq.length ? eq.map(e => {
+            const pmOvd = e.next_pm_date && new Date(e.next_pm_date)<now;
+            const pmSoon= e.next_pm_date && !pmOvd && (new Date(e.next_pm_date)-now)<30*86400000;
+            const eqDef = defects.filter(d=>d.equipment_id===e.id&&d.status==='open').length;
+            const statusCol = e.status==='operational'?'var(--green)':e.status==='defective'?'var(--red)':'var(--amber)';
+            return `<div class="sdp-eq-item">
+              <div class="sdp-status-dot" style="background:${statusCol};"></div>
+              <div style="flex:1;">
+                <div style="font-size:12px;font-weight:600;color:var(--text-bright);">${e.name}</div>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">${e.category||''}</div>
+              </div>
+              <div style="display:flex;gap:5px;align-items:center;">
+                ${eqDef ? `<span style="font-family:var(--mono);font-size:8px;background:rgba(224,82,82,0.12);color:var(--red);padding:1px 6px;border-radius:2px;">${eqDef} DEFECT${eqDef>1?'S':''}</span>` : ''}
+                ${pmOvd  ? `<span style="font-family:var(--mono);font-size:8px;background:rgba(224,82,82,0.12);color:var(--red);padding:1px 6px;border-radius:2px;">PM OVERDUE</span>` : ''}
+                ${pmSoon ? `<span style="font-family:var(--mono);font-size:8px;background:rgba(245,166,35,0.12);color:var(--amber);padding:1px 6px;border-radius:2px;">PM DUE SOON</span>` : ''}
+                ${e.next_pm_date ? `<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">PM: ${e.next_pm_date.substring(0,10)}</span>` : ''}
+              </div>
+            </div>`;
+          }).join('') : '<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">No equipment assigned</div>'}
+        </div>
+
+        <!-- Open defects -->
+        ${openDef.length ? `<div class="sdp-card">
+          <div class="sdp-card-title" style="color:var(--red);">⚠ ${openDef.length} OPEN DEFECT${openDef.length>1?'S':''}</div>
+          ${openDef.map(d => {
+            const eqName = allEq.find(e=>e.id===d.equipment_id)?.name || d.equipment_id;
+            return `<div class="sdp-defect-row">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text-bright);">${d.title||d.description||'Defect'}</div>
+                  <div style="font-family:var(--mono);font-size:9px;color:var(--amber);margin-top:2px;">${eqName}</div>
+                </div>
+                <span style="font-family:var(--mono);font-size:8px;background:rgba(224,82,82,0.12);color:var(--red);padding:1px 6px;border-radius:2px;">${(d.severity||'open').toUpperCase()}</span>
+              </div>
+              ${d.description&&d.title ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${d.description}</div>` : ''}
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:4px;">Raised: ${d.created_at?.substring(0,10)||'—'}</div>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
+
+        <!-- Overdue temp repairs -->
+        ${overduetr.length ? `<div class="sdp-card">
+          <div class="sdp-card-title" style="color:var(--amber);">⏱ ${overduetr.length} OVERDUE TEMP REPAIR${overduetr.length>1?'S':''}</div>
+          ${overduetr.map(t => {
+            const eqName = allEq.find(e=>e.id===t.equipment_id)?.name || '';
+            return `<div class="sdp-defect-row">
+              <div style="font-size:12px;font-weight:600;color:var(--text-bright);">${t.description||'Temp repair'}</div>
+              <div style="display:flex;gap:10px;margin-top:4px;font-family:var(--mono);font-size:9px;color:var(--text-dim);">
+                <span>${eqName}</span>
+                ${t.expiry_date ? `<span style="color:var(--red);">Expired: ${t.expiry_date.substring(0,10)}</span>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>` : ''}
+
+        <!-- PM overdue -->
+        ${pmOverdue.length ? `<div class="sdp-card">
+          <div class="sdp-card-title" style="color:var(--red);">🔧 ${pmOverdue.length} PM OVERDUE</div>
+          ${pmOverdue.map(e=>`<div class="sdp-defect-row">
+            <div style="font-size:12px;font-weight:600;color:var(--text-bright);">${e.name}</div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--red);margin-top:2px;">Was due: ${e.next_pm_date?.substring(0,10)||'—'}</div>
+          </div>`).join('')}
+        </div>` : ''}
+
+      </div>`;
+
+  } catch(e) {
+    document.getElementById('scoreDetailBody').innerHTML =
+      `<div style="color:var(--red);font-family:var(--mono);">${e.message}</div>`;
+  }
+}
+
+
+// ── HANDOVER NOTES FORM ──────────────────────────────────────
+
+let hoUserId = null, hoUserDesig = null;
+
+function openHandoverForm(userId, userName, designation) {
+  try {
+    hoUserId    = userId;
+    hoUserDesig = designation || '';
+    hoEditId    = null;
+
+    // Reset save button to POST mode
+    const saveBtn = document.querySelector('#handoverFormModal .btn-sm-primary');
+    if (saveBtn) saveBtn.onclick = () => saveHandoverNotes();
+
+    const titleEl = document.getElementById('hoFormTitle');
+    const subEl   = document.getElementById('hoFormSubtitle');
+    if (titleEl) titleEl.textContent = 'HANDOVER NOTES — ' + (designation||'').toUpperCase();
+    if (subEl)   subEl.textContent   = (userName||'') + ' · ' + new Date().toLocaleDateString();
+
+    document.getElementById('hoOutgoing').value      = userName || '';
+    document.getElementById('hoIncoming').value      = '';
+    document.getElementById('hoDate').value          = new Date().toISOString().substring(0,10);
+    document.getElementById('hoGeneralNotes').value  = '';
+    document.getElementById('hoSigOut').value        = '';
+    document.getElementById('hoFormError').style.display = 'none';
+
+    // Show modal immediately — don't wait for equipment load
+    document.getElementById('handoverFormModal').classList.add('open');
+
+    // Load equipment async after modal is visible
+    if (custVesselId) {
+      populateHandoverEquipment(designation || '').catch(e => {
+        const eqEl = document.getElementById('hoEquipmentSection');
+        if (eqEl) eqEl.innerHTML = '<div style="color:var(--red);font-size:11px;">Could not load equipment: ' + e.message + '</div>';
+      });
+    } else {
+      const eqEl = document.getElementById('hoEquipmentSection');
+      if (eqEl) eqEl.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">No vessel selected — select a vessel first.</div>';
+    }
+  } catch(e) {
+    toast('Error opening handover form: ' + e.message);
+    console.error('openHandoverForm error:', e);
+  }
+}
+
+async function populateHandoverEquipment(designation) {
+  const eqEl   = document.getElementById('hoEquipmentSection');
+  const osEl   = document.getElementById('hoOutstandingSection');
+  eqEl.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);">Loading equipment…</div>';
+
+  try {
+    const [eqRes, defRes, trRes] = await Promise.all([
+      fetch('/api/custodian/equipment?vessel_id=' + custVesselId, {headers:{'x-auth-token':getToken()}}),
+      fetch('/api/custodian/defects?vessel_id='   + custVesselId, {headers:{'x-auth-token':getToken()}}),
+      fetch('/api/custodian/temp-repairs?vessel_id=' + custVesselId, {headers:{'x-auth-token':getToken()}}),
+    ]);
+    const allEq  = await eqRes.json();
+    const allDef = await defRes.json();
+    const allTr  = await trRes.json();
+
+    // Filter to this designation
+    const myEq = allEq.filter(e => {
+      const norm = normaliseDesignation(e.custodian_designation||'');
+      const myNorm = normaliseDesignation(designation);
+      return norm === myNorm || e.custodian_designation === designation;
+    });
+
+    const now = new Date();
+
+    // Identify equipment that needs flagging
+    const flagged = myEq.filter(e => {
+      const hasDef   = allDef.some(d => d.equipment_id===e.id && d.status==='open');
+      const notRun   = e.status !== 'operational';
+      const spareOrd = (e.spare_parts||[]).some(s => s.status==='ordered'||s.status==='pending');
+      const pmOvd    = e.next_pm_date && new Date(e.next_pm_date) < now;
+      return hasDef || notRun || spareOrd || pmOvd;
+    });
+
+    const normal = myEq.filter(e => !flagged.includes(e));
+
+    // Build equipment rows
+    const renderEqRow = (e, idx) => {
+      const eqDefs  = allDef.filter(d => d.equipment_id===e.id && d.status==='open');
+      const eqTrs   = allTr.filter(t => t.equipment_id===e.id && t.status!=='completed');
+      const spares  = (e.spare_parts||[]).filter(s=>s.status==='ordered'||s.status==='pending');
+      const pmOvd   = e.next_pm_date && new Date(e.next_pm_date)<now;
+      const statusCol = e.status==='operational'?'var(--green)':e.status==='defective'?'var(--red)':'var(--amber)';
+      const isFlag  = flagged.includes(e);
+
+      return `<div style="background:${isFlag?'rgba(224,82,82,0.04)':'var(--surface2)'};border:1px solid ${isFlag?'rgba(224,82,82,0.2)':'var(--border)'};border-radius:6px;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;align-items:flex-start;gap:12px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:${statusCol};margin-top:4px;flex-shrink:0;"></div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <div style="font-size:12px;font-weight:700;color:var(--text-bright);">${e.name}</div>
+              <span style="font-family:var(--mono);font-size:8px;background:${statusCol}22;color:${statusCol};padding:1px 6px;border-radius:2px;">${(e.status||'operational').toUpperCase()}</span>
+              ${pmOvd?`<span style="font-family:var(--mono);font-size:8px;background:rgba(224,82,82,0.12);color:var(--red);padding:1px 6px;border-radius:2px;">PM OVERDUE</span>`:''}
+            </div>
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">${e.category||''}</div>
+
+            ${eqDefs.length?`<div style="margin-top:8px;">
+              <div style="font-family:var(--mono);font-size:8px;color:var(--red);letter-spacing:1px;margin-bottom:4px;">⚠ OPEN DEFECTS (${eqDefs.length})</div>
+              ${eqDefs.map(d=>`<div style="font-size:11px;color:var(--text);padding:3px 0;border-bottom:1px solid var(--border);">${d.title||d.description||'Defect'} <span style="color:var(--text-dim);font-size:10px;">— ${d.created_at?.substring(0,10)||''}</span></div>`).join('')}
+            </div>`:''}
+
+            ${spares.length?`<div style="margin-top:8px;">
+              <div style="font-family:var(--mono);font-size:8px;color:var(--amber);letter-spacing:1px;margin-bottom:4px;">📦 SPARES ${spares.some(s=>s.status==='ordered')?'ON ORDER':'PENDING'}</div>
+              ${spares.map(s=>`<div style="font-size:11px;color:var(--text);padding:2px 0;">${s.name} <span style="font-family:var(--mono);font-size:8px;color:var(--amber);">[${s.status?.toUpperCase()}]</span></div>`).join('')}
+            </div>`:''}
+
+            ${eqTrs.length?`<div style="margin-top:8px;">
+              <div style="font-family:var(--mono);font-size:8px;color:var(--amber);letter-spacing:1px;margin-bottom:4px;">🔩 TEMP REPAIR ACTIVE</div>
+              ${eqTrs.map(t=>`<div style="font-size:11px;color:var(--text);padding:2px 0;">${t.description||'Temp repair'}</div>`).join('')}
+            </div>`:''}
+          </div>
+          <div style="flex-shrink:0;">
+            <textarea id="hoNote_${e.id}" placeholder="Handover note for this item…"
+              style="width:200px;height:${isFlag?60:40}px;resize:vertical;font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:5px 8px;color:var(--text);">${isFlag ? (eqDefs.map(d=>d.title||d.description).join('; ')||'')+(spares.length?' — spares on order: '+spares.map(s=>s.name).join(', '):'')+(pmOvd?' — PM overdue':'') : ''}</textarea>
+          </div>
+        </div>
+      </div>`;
+    };
+
+    if (!myEq.length) {
+      eqEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">No equipment assigned to ${designation}. Update equipment custodian designations in the Equipment Registry.</div>`;
+    } else {
+      const flaggedHtml = flagged.length
+        ? `<div style="font-family:var(--mono);font-size:8px;color:var(--red);letter-spacing:1.5px;margin-bottom:8px;">⚠ ${flagged.length} ITEM${flagged.length>1?'S':''} REQUIRING ATTENTION</div>
+           ${flagged.map(renderEqRow).join('')}
+           ${normal.length ? `<div style="font-family:var(--mono);font-size:8px;color:var(--green);letter-spacing:1.5px;margin:14px 0 8px;">✓ ${normal.length} ITEM${normal.length>1?'S':''} OPERATIONAL</div>${normal.map(renderEqRow).join('')}` : ''}`
+        : `<div style="font-family:var(--mono);font-size:8px;color:var(--green);letter-spacing:1.5px;margin-bottom:8px;">✓ ALL ${myEq.length} ITEMS OPERATIONAL</div>${myEq.map(renderEqRow).join('')}`;
+      eqEl.innerHTML = flaggedHtml;
+    }
+
+    // Outstanding items summary (auto-generated)
+    const allDefs  = allDef.filter(d => myEq.some(e=>e.id===d.equipment_id) && d.status==='open');
+    const allOvdTr = allTr.filter(t => myEq.some(e=>e.id===t.equipment_id) && t.status==='overdue');
+    osEl.innerHTML = (allDefs.length||allOvdTr.length) ? `
+      <div style="background:rgba(245,166,35,0.05);border:1px solid rgba(245,166,35,0.2);border-radius:6px;padding:14px 16px;margin-bottom:12px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--amber);margin-bottom:8px;">AUTO-GENERATED FROM EQUIPMENT DATA — EDIT AS NEEDED</div>
+        <textarea id="hoOutstandingNotes" style="width:100%;height:80px;resize:vertical;font-size:11px;">${
+          allDefs.map(d => {
+            const eq = allEq.find(e=>e.id===d.equipment_id);
+            return `• ${eq?.name||'Equipment'}: ${d.title||d.description||'Open defect'}`;
+          }).concat(
+            allOvdTr.map(t => {
+              const eq = allEq.find(e=>e.id===t.equipment_id);
+              return `• ${eq?.name||'Equipment'}: Temp repair overdue — ${t.description||''}`;
+            })
+          ).join('\n')
+        }</textarea>
+      </div>` : `<div class="fg"><label style="font-size:9px;">Outstanding items (none auto-detected)</label>
+        <textarea id="hoOutstandingNotes" style="height:60px;resize:vertical;" placeholder="List any pending jobs, running repairs, or items to monitor…"></textarea>
+      </div>`;
+
+  } catch(e) {
+    eqEl.innerHTML = `<div style="color:var(--red);font-size:11px;">Failed to load equipment: ${e.message}</div>`;
+  }
+}
+
+async function saveHandoverNotes() {
+  const outgoing = document.getElementById('hoOutgoing').value.trim();
+  const incoming = document.getElementById('hoIncoming').value.trim();
+  const date     = document.getElementById('hoDate').value;
+  const sig      = document.getElementById('hoSigOut').value.trim();
+  const errEl    = document.getElementById('hoFormError');
+
+  if (!outgoing || !date) { errEl.textContent = 'Outgoing officer and date are required'; errEl.style.display=''; return; }
+  if (!sig) { errEl.textContent = 'Please type your full name to confirm the handover'; errEl.style.display=''; return; }
+  errEl.style.display = 'none';
+
+  // Collect equipment notes
+  const allEq = await fetch('/api/custodian/equipment?vessel_id='+custVesselId, {headers:{'x-auth-token':getToken()}}).then(r=>r.json()).catch(()=>[]);
+  const myEq  = allEq.filter(e => normaliseDesignation(e.custodian_designation||'') === normaliseDesignation(hoUserDesig||'') || e.custodian_designation===hoUserDesig);
+  const eqNotes = myEq.map(e => {
+    const note = document.getElementById('hoNote_'+e.id)?.value?.trim();
+    return { equipment_id:e.id, equipment_name:e.name, status:e.status, note:note||'' };
+  }).filter(n => n.note || n.status !== 'operational');
+
+  const outstanding = document.getElementById('hoOutstandingNotes')?.value?.trim() || '';
+  const general     = document.getElementById('hoGeneralNotes').value.trim();
+
+  const payload = {
+    vessel_id: custVesselId,
+    outgoing_officer: outgoing,
+    incoming_officer: incoming || '— Pending sign-on —',
+    handover_date: date,
+    department: (hoUserDesig||'').toLowerCase().includes('eng')||hoUserDesig==='Electrician' ? 'engine' : 'deck',
+    designation: hoUserDesig,
+    equipment_notes: eqNotes,
+    outstanding_items: outstanding,
+    equipment_health: general,
+    signed_by: sig,
+    signed_at: new Date().toISOString(),
+  };
+
+  try {
+    const editId = hoEditId;
+    await fetch(editId ? '/api/custodian/handovers/'+editId : '/api/custodian/handovers', {
+      method: editId ? 'PUT' : 'POST',
+      headers:{'Content-Type':'application/json','x-auth-token':getToken()},
+      body: JSON.stringify(payload)
+    });
+    hoEditId = null;
+    // Restore save button to POST mode
+    const saveBtn = document.querySelector('#handoverFormModal .btn-sm-primary');
+    if (saveBtn) saveBtn.onclick = () => saveHandoverNotes();
+    closeModal('handoverFormModal');
+    toast(editId ? 'Handover updated' : 'Handover notes saved — ' + eqNotes.length + ' equipment items recorded');
+    loadHandovers();
+  } catch(e) { errEl.textContent = 'Save failed: '+e.message; errEl.style.display=''; }
+}
+
+function closeScoreDetail() {
+  document.getElementById('scoreDetailPanel').classList.remove('open');
+}
+
+// ── EQUIPMENT REGISTRY ───────────────────────────────────
+async function loadEquipmentRegistry() {
+  if (!custVesselId) return;
+  const el = document.getElementById('registryContent');
+  el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);padding:10px 0;">Loading…</div>';
+  try {
+    const res = await fetch('/api/custodian/equipment?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    custEquipment = await res.json();
+    if (!custEquipment.length) {
+      el.innerHTML = `<div style="text-align:center;padding:40px 0;">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:12px;">No equipment registered for this vessel</div>
+        <button class="btn-sm btn-sm-primary" onclick="seedEquipment()">⚡ SEED DEFAULT EQUIPMENT (LPG VESSEL)</button>
+      </div>`; return;
+    }
+    const now = new Date();
+    const cats = [...new Set(custEquipment.map(e=>e.category))];
+    el.innerHTML = cats.map(cat => {
+      const items = custEquipment.filter(e=>e.category===cat);
+      return `<div class="eq-category">
+        <div class="eq-cat-label">${cat} <span style="color:var(--text-dim);font-weight:400;">(${items.length})</span></div>
+        <div class="eq-grid">
+          ${items.map(eq => {
+            const pmOverdue = eq.next_pm_date && new Date(eq.next_pm_date) < now;
+            return `<div class="eq-card status-${eq.status||'operational'}" onclick="openEqModal('${eq.id}')">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div class="eq-name">${eq.name}</div>
+                <span class="eq-status-badge ${eq.status||'operational'}">${eq.status||'operational'}</span>
+              </div>
+              <div class="eq-custodian">${eq.custodian_designation ? `<strong>${eq.custodian_designation}</strong>` : '<span style="color:var(--red);">⚠ UNASSIGNED</span>'}</div>
+              <div class="eq-pm ${pmOverdue?'overdue':''}">
+                ${eq.next_pm_date ? (pmOverdue?'⚠ PM OVERDUE: ':'Next PM: ')+eq.next_pm_date : 'No PM scheduled'}
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-family:var(--mono);font-size:11px;">${e.message}</div>`; }
+}
+
+async function seedEquipment() {
+  if (!custVesselId) return toast('Select a vessel first');
+  if (!confirm('Seed default LPG vessel equipment list? This will add all standard equipment categories.')) return;
+  try {
+    const res = await fetch('/api/custodian/equipment/seed/' + custVesselId, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-auth-token': getToken() },
+      body: JSON.stringify({})
+    });
+    const d = await res.json();
+    if (d.skipped) return toast('Equipment already seeded for this vessel');
+    toast('✓ ' + d.seeded + ' equipment items seeded');
+    loadEquipmentRegistry();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ── DEFECTS ──────────────────────────────────────────────
+async function loadDefects() {
+  if (!custVesselId) return;
+  const el = document.getElementById('defectsContent');
+  el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);padding:10px 0;">Loading…</div>';
+  try {
+    const res = await fetch('/api/custodian/defects?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    const defects = await res.json();
+    const badge = document.getElementById('defectBadge');
+    const open = defects.filter(d=>d.status==='open').length;
+    if (badge) { badge.textContent = open; badge.style.display = open ? '' : 'none'; }
+    if (!defects.length) { el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">No defects logged</div>'; return; }
+    el.innerHTML = defects.map(d => {
+      const steps = (d.troubleshooting_steps||[]);
+      const hasSteps = steps.length > 0;
+      return `<div class="defect-card ${d.status||'open'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div class="defect-title">${d.title||'Unnamed defect'}</div>
+            <div class="defect-meta">${d.equipment_name||'—'} · ${d.severity||'medium'} · Raised by ${d.raised_by_name||'—'} · ${d.created_at?.substring(0,10)||'—'}</div>
+          </div>
+          <span class="status-badge ${d.status==='resolved'?'status-closed':d.status==='critical'?'status-open':'status-progress'}">${(d.status||'open').toUpperCase()}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text);margin-bottom:10px;">${d.description||'—'}</div>
+        ${!hasSteps ? `<div style="background:rgba(224,82,82,0.08);border:1px solid rgba(224,82,82,0.2);border-radius:4px;padding:8px 12px;font-size:11px;color:var(--red);margin-bottom:10px;">⚠ NO TROUBLESHOOTING STEPS RECORDED — This will reduce the custodian score</div>` : ''}
+        ${hasSteps ? `<div class="defect-steps">${steps.map(s=>`
+          <div class="step-item">
+            ${s.text}
+            ${s.manual_referenced ? '<div class="manual-ref">✓ Maker manual consulted</div>' : ''}
+            <div class="step-by">${s.by||''} · ${s.at?.substring(0,16)||''}</div>
+          </div>`).join('')}</div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn-sm btn-sm-ghost" onclick="openAddStepModal('${d.id}')">+ ADD STEP</button>
+          ${d.status!=='resolved'?`<button class="btn-sm btn-sm-primary" style="background:var(--green);color:#000;" onclick="resolveDefect('${d.id}')">✓ MARK RESOLVED</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:11px;">${e.message}</div>`; }
+}
+
+// ── TEMP REPAIRS ────────────────────────────────────────
+async function loadTempRepairs() {
+  if (!custVesselId) return;
+  const el = document.getElementById('trContent');
+  try {
+    const res = await fetch('/api/custodian/temp-repairs?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    const trs = await res.json();
+    const overdue = trs.filter(t=>t.status==='overdue').length;
+    const badge = document.getElementById('trBadge');
+    if (badge) { badge.textContent = overdue; badge.style.display = overdue ? '' : 'none'; }
+    if (!trs.length) { el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">No temporary repairs on record</div>'; return; }
+    const now = new Date();
+    el.innerHTML = trs.map(t => {
+      const expiry = t.expiry_date ? new Date(t.expiry_date) : null;
+      const daysLeft = expiry ? Math.ceil((expiry-now)/86400000) : null;
+      const expiryClass = !expiry ? 'ok' : daysLeft < 0 ? 'overdue' : daysLeft <= 7 ? 'warning' : 'ok';
+      return `<div class="tr-card ${t.status==='overdue'?'overdue':''}">
+        <div class="tr-expiry ${expiryClass}">
+          ${daysLeft===null?'—':daysLeft<0?Math.abs(daysLeft)+'d<br>OVERDUE':daysLeft+'d<br>left'}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:var(--text-bright);">${t.description||'—'}</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px;">${t.equipment_name||'—'} · Applied ${t.date_applied||t.created_at?.substring(0,10)||'—'} · By ${t.raised_by||'—'}</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">${t.permanent_fix_plan||'No permanent fix plan specified'}</div>
+        </div>
+        ${t.status!=='closed'?`<button class="btn-sm btn-sm-primary" style="background:var(--green);color:#000;" onclick="closeTempRepair('${t.id}')">CLOSE</button>`:'<span style="font-family:var(--mono);font-size:9px;color:var(--green);">CLOSED</span>'}
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:11px;">${e.message}</div>`; }
+}
+
+// ── ALARMS ──────────────────────────────────────────────
+async function loadAlarms() {
+  if (!custVesselId) return;
+  const el = document.getElementById('alarmsContent');
+  try {
+    const res = await fetch('/api/custodian/alarms?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    const alarms = await res.json();
+    const now = new Date();
+    const overdueWo = alarms.filter(a => {
+      const age = (now - new Date(a.created_at)) / 3600000;
+      return a.status === 'open' && age > 24 && !a.work_order_ref;
+    }).length;
+    const badge = document.getElementById('alarmBadge');
+    if (badge) { badge.textContent = overdueWo; badge.style.display = overdueWo ? '' : 'none'; }
+    if (!alarms.length) { el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">No alarms logged</div>'; return; }
+    el.innerHTML = alarms.map(a => {
+      const age = (now - new Date(a.created_at)) / 3600000;
+      const needsWo = age > 24 && !a.work_order_ref && a.status === 'open';
+      return `<div class="alarm-card ${needsWo?'overdue-wo':a.work_order_ref?'has-wo':''}">
+        <div class="alarm-age">${age < 24 ? Math.round(age)+'h' : Math.round(age/24)+'d'}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:var(--text-bright);">${a.description||'—'}</div>
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:2px;">${a.equipment_name||'—'} · ${a.created_at?.substring(0,16)||'—'} · ${a.logged_by||'—'}</div>
+          ${a.work_order_ref ? `<div style="font-family:var(--mono);font-size:9px;color:var(--green);margin-top:3px;">✓ WO: ${a.work_order_ref}</div>` : ''}
+          ${needsWo ? `<div style="font-size:11px;color:var(--red);margin-top:4px;">⚠ 24h WO rule breached — add work order reference</div>` : ''}
+        </div>
+        ${needsWo ? `<button class="btn-sm btn-sm-ghost" onclick="addWoRef('${a.id}')">ADD WO REF</button>` : ''}
+        ${a.status==='open' ? `<button class="btn-sm btn-sm-primary" style="background:var(--green);color:#000;" onclick="closeAlarm('${a.id}')">CLEAR</button>` : '<span style="font-family:var(--mono);font-size:9px;color:var(--green);">CLEARED</span>'}
+      </div>`;
+    }).join('');
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:11px;">${e.message}</div>`; }
+}
+
+// ── ROUNDS ENGINE ───────────────────────────────────────
+let activeRound = null;      // current round being filled in
+let activeChecklist = null;  // checklist template
+let roundAnswers = {};       // { checkId: { value, notes } }
+
+// ── MY ROUNDS (officer view) ─────────────────────────────
+async function loadMyRounds() {
+  if (!custVesselId) return;
+  const user = getCurrentUser();
+  const el = document.getElementById('myRoundsContent');
+  el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);">Loading…</div>';
+  try {
+    // Get my equipment (by designation)
+    const eqRes  = await fetch('/api/custodian/equipment?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    custEquipment = await eqRes.json();
+    const myDesig = normaliseDesignation(user?.designation || '');
+    const myEq    = custEquipment.filter(e => myDesig && normaliseDesignation(e.custodian_designation||'') === myDesig);
+
+    // Get round status for this vessel
+    const statRes = await fetch('/api/custodian/rounds/status/' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    const statuses = await statRes.json();
+
+    // Filter to my equipment only
+    const myStatuses = statuses.filter(s => myEq.some(e => e.id === s.equipment_id));
+    const overdueCount = myStatuses.filter(s => s.is_overdue && s.has_checklist).length;
+
+    const badge = document.getElementById('roundsBadge');
+    if (badge) { badge.textContent = overdueCount; badge.style.display = overdueCount ? '' : 'none'; }
+
+    if (!myEq.length) {
+      el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);padding:20px 0;">No equipment assigned to your designation</div>';
+      return;
+    }
+
+    el.innerHTML = `
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1.5px;margin-bottom:16px;">
+        ${overdueCount} ROUND${overdueCount!==1?'S':''} OVERDUE · ${myStatuses.filter(s=>!s.has_checklist).length} AWAITING CHECKLIST SETUP
+      </div>
+      <div class="round-status-grid">
+        ${myStatuses.map(s => renderRoundCard(s, false)).join('')}
+      </div>`;
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:11px;">${e.message}</div>`; }
+}
+
+function renderRoundCard(s, isSupervisor) {
+  const cls = !s.has_checklist ? 'no-checklist' : s.is_overdue ? 'overdue' : s.due_in_days <= 3 ? 'due-soon' : 'ok';
+  const badgeText = !s.has_checklist ? 'NO CHECKLIST' :
+                    s.is_overdue ? (s.days_since === null ? 'NEVER DONE' : `OVERDUE ${s.days_since}d`) :
+                    s.due_in_days <= 3 ? `DUE IN ${s.due_in_days}d` : `DUE IN ${s.due_in_days}d`;
+  const scoreColor = s.last_score == null ? '' : s.last_score >= 80 ? 'good' : s.last_score >= 60 ? 'warn' : 'poor';
+
+  return `<div class="round-eq-card ${cls}" id="rcard_${s.equipment_id}">
+    <div class="round-eq-name">${s.equipment_name}</div>
+    <div class="round-eq-cat">${s.category}</div>
+    ${s.custodian_designation && isSupervisor ? `<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-bottom:6px;">${s.custodian_designation}</div>` : ''}
+    <span class="round-due-badge ${cls}">${badgeText}</span>
+    ${s.last_score != null ? `
+      <div style="margin-top:8px;">
+        <div class="round-last-score ${scoreColor}">${s.last_score}%</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">Last round score · ${s.last_round_date?.substring(0,10)||'—'}</div>
+      </div>` : `<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:8px;">No rounds completed yet</div>`}
+    ${s.has_checklist && !isSupervisor ? `<button class="round-start-btn" onclick="startRound('${s.equipment_id}','${s.equipment_name.replace(/'/g,"\'")}')">
+      ${s.is_overdue ? '⚠ START OVERDUE ROUND' : '▶ START ROUND'}
+    </button>` : ''}
+    ${!s.has_checklist && !isSupervisor ? `<div style="font-size:10px;color:var(--text-dim);margin-top:10px;">Ask your superintendent to generate a checklist for this equipment</div>` : ''}
+  </div>`;
+}
+
+// ── START A ROUND ────────────────────────────────────────
+async function startRound(eqId, eqName) {
+  try {
+    // Load checklist
+    const clRes = await fetch('/api/custodian/checklists?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    const checklists = await clRes.json();
+    const cl = checklists.find(c => c.equipment_id === eqId);
+    if (!cl) return toast('No checklist found for this equipment');
+
+    // Check for in-progress round
+    const rRes = await fetch('/api/custodian/rounds?vessel_id=' + custVesselId + '&equipment_id=' + eqId, { headers: { 'x-auth-token': getToken() } });
+    const rounds = await rRes.json();
+    const inProgress = rounds.find(r => r.status === 'in_progress');
+
+    if (inProgress) {
+      activeRound = inProgress;
+      roundAnswers = inProgress.answers || {};
+    } else {
+      // Create new round
+      const rndRes = await fetch('/api/custodian/rounds', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-auth-token': getToken() },
+        body: JSON.stringify({
+          vessel_id: custVesselId,
+          equipment_id: eqId,
+          equipment_name: eqName,
+          round_number: rounds.filter(r=>r.status==='submitted').length + 1,
+          checklist_id: cl.id
+        })
+      });
+      activeRound = await rndRes.json();
+      roundAnswers = {};
+    }
+
+    activeChecklist = cl;
+    openChecklistOverlay();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function openChecklistOverlay() {
+  const cl = activeChecklist;
+  const overlay = document.getElementById('checklistOverlay');
+  document.getElementById('clOverlayTitle').textContent = activeRound.equipment_name.toUpperCase() + ' — INSPECTION ROUND';
+  document.getElementById('clOverlaySubtitle').textContent = 'ROUND ' + (activeRound.round_number||1) + ' · ' + new Date().toDateString().toUpperCase() + ' · ' + cl.checks.length + ' CHECKS';
+
+  renderChecklistForm();
+  overlay.classList.add('open');
+}
+
+function renderChecklistForm() {
+  const checks = activeChecklist.checks;
+  const container = document.getElementById('clChecksContainer');
+  container.innerHTML = checks.map((c, i) => {
+    const ans = roundAnswers[c.id];
+    const cardCls = !ans ? '' : getAnswerClass(c, ans.value);
+    return `<div class="check-card ${cardCls} ${c.critical?'critical-flag':''}" id="chk_${c.id}">
+      <div class="check-num">CHECK ${String(i+1).padStart(2,'0')} · ${c.points}pts${c.critical?' · <span style="color:var(--red);">SAFETY CRITICAL</span>':''}</div>
+      ${c.critical ? '<div class="check-critical-tag">🚨 CRITICAL — bad answer blocks submission</div>' : ''}
+      <div class="check-text">${c.text}</div>
+      ${c.hint ? `<div class="check-hint">💡 ${c.hint}</div>` : ''}
+      ${buildCheckInput(c, ans)}
+      <textarea class="check-notes-input" id="notes_${c.id}" placeholder="Notes / observations (optional)…" oninput="setCheckNotes('${c.id}',this.value)">${ans?.notes||''}</textarea>
+    </div>`;
+  }).join('');
+  updateChecklistProgress();
+}
+
+function buildCheckInput(c, ans) {
+  const val = ans?.value || '';
+  if (c.answer_type === 'yes_no') {
+    return `<div class="yn-btns">
+      ${['YES','NO','N/A'].map(opt =>
+        `<button class="yn-btn ${val===opt?'sel-'+opt.toLowerCase():''}" onclick="setCheckAnswer('${c.id}','${opt}',this)">${opt}</button>`
+      ).join('')}
+    </div>`;
+  }
+  if (c.answer_type === 'condition') {
+    const opts = ['Good','Satisfactory','Requires Attention','Critical'];
+    return `<div class="cond-btns">
+      ${opts.map(opt =>
+        `<button class="cond-btn ${val===opt?'sel-'+opt.replace(' ','-'):''}" onclick="setCheckAnswer('${c.id}','${opt}',this)">${opt}</button>`
+      ).join('')}
+    </div>`;
+  }
+  if (c.answer_type === 'numeric') {
+    const rangeHint = (c.min_normal != null || c.max_normal != null)
+      ? ` (normal: ${c.min_normal??'—'} – ${c.max_normal??'—'} ${c.unit||''})`
+      : '';
+    return `<div style="display:flex;align-items:center;gap:10px;">
+      <input type="number" step="any" style="width:140px;font-size:14px;font-family:var(--mono);padding:8px 10px;"
+        value="${val}" placeholder="Enter value"
+        oninput="setCheckAnswer('${c.id}',this.value,this)">
+      <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim);">${c.unit||''}${rangeHint}</span>
+    </div>`;
+  }
+  // text
+  return `<input type="text" style="width:100%;font-size:12px;padding:8px 10px;"
+    value="${val}" placeholder="Enter observation…"
+    oninput="setCheckAnswer('${c.id}',this.value,this)">`;
+}
+
+function getAnswerClass(c, val) {
+  if (c.answer_type === 'yes_no') {
+    if (val === 'N/A') return '';
+    return val === c.good_answer ? 'answered-good' : 'answered-bad';
+  }
+  if (c.answer_type === 'condition') {
+    const good = c.good_answers || ['Good','Satisfactory'];
+    const crit = c.critical_answers || ['Critical'];
+    if (crit.includes(val)) return 'answered-bad';
+    if (good.includes(val)) return 'answered-good';
+    return 'answered-warn';
+  }
+  if (c.answer_type === 'numeric') {
+    const n = parseFloat(val);
+    if (isNaN(n)) return '';
+    const ok = (c.min_normal == null || n >= c.min_normal) && (c.max_normal == null || n <= c.max_normal);
+    return ok ? 'answered-good' : 'answered-bad';
+  }
+  return val ? 'answered-good' : '';
+}
+
+function setCheckAnswer(checkId, value, el) {
+  roundAnswers[checkId] = roundAnswers[checkId] || {};
+  roundAnswers[checkId].value = value;
+  // Update card styling
+  const c = activeChecklist.checks.find(c => c.id === checkId);
+  const card = document.getElementById('chk_' + checkId);
+  if (c && card) {
+    card.className = card.className.replace(/answered-\w+/g,'').trim();
+    const cls = getAnswerClass(c, value);
+    if (cls) card.classList.add(cls);
+  }
+  // Update button selection
+  if (el && el.classList.contains('yn-btn')) {
+    el.closest('.yn-btns')?.querySelectorAll('.yn-btn').forEach(b => b.className = b.className.replace(/sel-\w+/,'').trim());
+    el.classList.add('sel-' + value.toLowerCase());
+  }
+  if (el && el.classList.contains('cond-btn')) {
+    el.closest('.cond-btns')?.querySelectorAll('.cond-btn').forEach(b => b.className = b.className.replace(/sel-[\w-]+/,'').trim());
+    el.classList.add('sel-' + value.replace(' ','-'));
+  }
+  updateChecklistProgress();
+}
+
+function setCheckNotes(checkId, notes) {
+  roundAnswers[checkId] = roundAnswers[checkId] || {};
+  roundAnswers[checkId].notes = notes;
+}
+
+function updateChecklistProgress() {
+  const checks = activeChecklist.checks;
+  const answered = checks.filter(c => roundAnswers[c.id]?.value).length;
+  const total = checks.length;
+  document.getElementById('clProgress').textContent = answered + ' / ' + total;
+  document.getElementById('clProgressBar').style.width = Math.round(answered/total*100) + '%';
+
+  // Check for critical blockers
+  const blockers = checks.filter(c => {
+    const ans = roundAnswers[c.id];
+    if (!ans?.value || !c.critical) return false;
+    if (c.answer_type==='yes_no' && ans.value !== c.good_answer && ans.value !== 'N/A') return true;
+    if (c.answer_type==='condition' && (c.critical_answers||['Critical']).includes(ans.value)) return true;
+    if (c.answer_type==='numeric') {
+      const n = parseFloat(ans.value);
+      if (!isNaN(n) && ((c.min_normal!=null&&n<c.min_normal)||(c.max_normal!=null&&n>c.max_normal))) return true;
+    }
+    return false;
+  });
+
+  const blockerBox = document.getElementById('clCriticalBlockers');
+  const blockerList = document.getElementById('clBlockerList');
+  const submitBtn = document.getElementById('clSubmitBtn');
+  if (blockers.length) {
+    blockerBox.style.display = 'block';
+    blockerList.innerHTML = blockers.map(b => `<div style="margin-bottom:4px;">⚠ ${b.text}</div>`).join('');
+    submitBtn.style.opacity = '0.4';
+    submitBtn.title = 'Resolve critical findings first';
+  } else {
+    blockerBox.style.display = 'none';
+    submitBtn.style.opacity = '';
+    submitBtn.title = '';
+  }
+
+  // Footer status
+  const unanswered = total - answered;
+  document.getElementById('clFooterStatus').textContent = unanswered > 0
+    ? unanswered + ' check' + (unanswered>1?'s':'')+' remaining'
+    : '✓ All checks completed — ready to submit';
+}
+
+async function saveRoundDraft() {
+  if (!activeRound) return;
+  await fetch('/api/custodian/rounds/' + activeRound.id, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-auth-token': getToken() },
+    body: JSON.stringify({ answers: roundAnswers })
+  });
+  toast('Draft saved');
+}
+
+async function submitRound() {
+  if (!activeRound) return;
+
+  // Check for unresolved critical blockers
+  const checks = activeChecklist.checks;
+  const blockers = checks.filter(c => {
+    const ans = roundAnswers[c.id];
+    if (!ans?.value || !c.critical) return false;
+    if (c.answer_type==='yes_no' && ans.value !== c.good_answer && ans.value !== 'N/A') return true;
+    if (c.answer_type==='condition' && (c.critical_answers||['Critical']).includes(ans.value)) return true;
+    if (c.answer_type==='numeric') {
+      const n = parseFloat(ans.value);
+      if (!isNaN(n) && ((c.min_normal!=null&&n<c.min_normal)||(c.max_normal!=null&&n>c.max_normal))) return true;
+    }
+    return false;
+  });
+
+  if (blockers.length) {
+    const ref = document.getElementById('clEscalationRef').value.trim();
+    if (!ref) {
+      toast('⚠ Critical findings found — enter escalation reference before submitting');
+      document.getElementById('clEscalationRef').focus();
+      return;
+    }
+    // Add escalation note to answers
+    roundAnswers['_escalation'] = { value: ref, notes: 'Critical findings escalated' };
+  }
+
+  const btn = document.getElementById('clSubmitBtn');
+  btn.textContent = 'SUBMITTING…'; btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/custodian/rounds/' + activeRound.id + '/submit', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-auth-token': getToken() },
+      body: JSON.stringify({ answers: roundAnswers })
+    });
+    const result = await res.json();
+    if (!res.ok) { toast('Submit failed: ' + result.error); btn.textContent = 'SUBMIT ROUND →'; btn.disabled = false; return; }
+
+    // Show result
+    closeChecklistOverlay();
+    const scoreColor = result.score >= 80 ? 'var(--green)' : result.score >= 60 ? 'var(--amber)' : 'var(--red)';
+    const card = document.getElementById('rcard_' + activeRound.equipment_id);
+
+    // Show success toast with score
+    toast(`Round submitted ✓ — Score: ${result.score}%${result.defectsRaised.length ? ' · ' + result.defectsRaised.length + ' defect(s) auto-raised' : ''}`);
+
+    if (result.belowThreshold) {
+      setTimeout(() => toast('⚠ Score below 70% — superintendent has been flagged'), 1500);
+    }
+
+    loadMyRounds();
+    activeRound = null; activeChecklist = null; roundAnswers = {};
+  } catch(e) {
+    toast('Error: ' + e.message);
+    btn.textContent = 'SUBMIT ROUND →'; btn.disabled = false;
+  }
+}
+
+function closeChecklistOverlay() {
+  document.getElementById('checklistOverlay').classList.remove('open');
+}
+
+// ── ALL ROUNDS (supervisor view) ─────────────────────────
+async function loadAllRounds() {
+  if (!custVesselId) return;
+  const el = document.getElementById('allRoundsContent');
+  el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);">Loading…</div>';
+  try {
+    // CE/Master can do rounds themselves — only strict shore supers are read-only
+    const cu = getCurrentUser();
+    const isStrictSuper = ['superintendent','admin','fleet_manager','deputy_fleet_manager'].includes(cu?.role);
+    const statRes = await fetch('/api/custodian/rounds/status/' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+    const statuses = await statRes.json();
+    const overdueCount = statuses.filter(s => s.is_overdue && s.has_checklist).length;
+
+    const badge = document.getElementById('roundsBadgeS');
+    if (badge) { badge.textContent = overdueCount; badge.style.display = overdueCount ? '' : 'none'; }
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;">
+        ${[
+          ['Total Equipment', statuses.length, 'var(--text)'],
+          ['Overdue Rounds', statuses.filter(s=>s.is_overdue&&s.has_checklist).length, 'var(--red)'],
+          ['No Checklist', statuses.filter(s=>!s.has_checklist).length, 'var(--amber)'],
+          ['Up To Date', statuses.filter(s=>!s.is_overdue&&s.has_checklist).length, 'var(--green)'],
+        ].map(([l,v,c]) => `<div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px 14px;">
+          <div style="font-family:var(--mono);font-size:28px;font-weight:700;color:${c};line-height:1;">${v}</div>
+          <div style="font-family:var(--mono);font-size:8px;color:var(--text-dim);letter-spacing:1px;margin-top:4px;">${l.toUpperCase()}</div>
+        </div>`).join('')}
+      </div>
+      <div class="round-status-grid">
+        ${statuses.map(s => renderRoundCard(s, isStrictSuper)).join('')}
+      </div>`;
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:11px;">${e.message}</div>`; }
+}
+
+// ── CHECKLIST TEMPLATE EDITOR ────────────────────────────
+async function loadChecklistTemplates() {
+  if (!custVesselId) return;
+  const el = document.getElementById('checklistsContent');
+  el.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--amber);">Loading…</div>';
+  try {
+    const [eqRes, clRes] = await Promise.all([
+      fetch('/api/custodian/equipment?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } }),
+      fetch('/api/custodian/checklists?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } })
+    ]);
+    custEquipment = await eqRes.json();
+    const checklists = await clRes.json();
+
+    el.innerHTML = `
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:1.5px;margin-bottom:16px;">
+        ${checklists.length} CHECKLISTS GENERATED · ${custEquipment.length - checklists.length} PENDING
+      </div>
+      ${custEquipment.map(eq => {
+        const cl = checklists.find(c => c.equipment_id === eq.id);
+        return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--text-bright);">${eq.name}</div>
+              <div style="font-family:var(--mono);font-size:9px;color:var(--amber);margin-top:2px;">${eq.category} · ${eq.custodian_designation||'Unassigned'}</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              ${cl ? `<span style="font-family:var(--mono);font-size:9px;color:var(--green);">✓ ${cl.checks.length} CHECKS</span>` : '<span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">NO CHECKLIST</span>'}
+              <button class="btn-sm ${cl?'btn-sm-ghost':'btn-sm-primary'}" onclick="generateChecklist('${eq.id}','${eq.name.replace(/'/g,"\'")}','${eq.category}',this)">
+                ${cl ? '⚡ REGENERATE' : '✦ GENERATE CHECKLIST'}
+              </button>
+              ${cl ? `<button class="btn-sm btn-sm-ghost" onclick="toggleChecklistEditor('${cl.id}')">EDIT</button>` : ''}
+            </div>
+          </div>
+          ${cl ? `<div id="cledit_${cl.id}" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+            ${cl.checks.map((c,i) => `
+              <div class="check-editor-row">
+                <div>
+                  <div class="check-editor-text">${c.text}</div>
+                  <div class="check-editor-meta">${c.answer_type} · ${c.points}pts${c.critical?' · CRITICAL':''}</div>
+                </div>
+                <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);">${c.auto_defect?'AUTO-DEFECT':''}</span>
+                <button class="btn-sm btn-sm-ghost" style="font-size:9px;" onclick="editCheckItem('${cl.id}',${i})">EDIT</button>
+                <button class="btn-sm btn-sm-ghost" style="font-size:9px;color:var(--red);" onclick="removeCheckItem('${cl.id}',${i})">✕</button>
+              </div>`).join('')}
+            <button class="btn-sm btn-sm-ghost" style="margin-top:8px;" onclick="addCheckItem('${cl.id}')">+ ADD CHECK</button>
+          </div>` : ''}
+        </div>`;
+      }).join('')}`;
+  } catch(e) { el.innerHTML = `<div style="color:var(--red);font-size:11px;">${e.message}</div>`; }
+}
+
+async function generateChecklist(eqId, eqName, category, btn) {
+  btn.textContent = '⏳ GENERATING…'; btn.disabled = true;
+  try {
+    const res = await fetch('/api/custodian/checklists/generate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-auth-token': getToken() },
+      body: JSON.stringify({ equipment_id: eqId, equipment_name: eqName, category, vessel_id: custVesselId })
+    });
+    const cl = await res.json();
+    if (!res.ok) throw new Error(cl.error);
+    toast(`✓ Checklist generated — ${cl.checks.length} checks for ${eqName}`);
+    loadChecklistTemplates();
+  } catch(e) {
+    toast('Generation failed: ' + e.message);
+    btn.textContent = '⚡ REGENERATE'; btn.disabled = false;
+  }
+}
+
+function toggleChecklistEditor(clId) {
+  const el = document.getElementById('cledit_' + clId);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function removeCheckItem(clId, idx) {
+  const clRes = await fetch('/api/custodian/checklists?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+  const cls = await clRes.json();
+  const cl = cls.find(c => c.id === clId);
+  if (!cl) return;
+  cl.checks.splice(idx, 1);
+  await fetch('/api/custodian/checklists/' + clId, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-auth-token': getToken() },
+    body: JSON.stringify({ checks: cl.checks })
+  });
+  loadChecklistTemplates();
+  toast('Check removed');
+}
+
+async function addCheckItem(clId) {
+  const text = prompt('Check description:');
+  if (!text) return;
+  const clRes = await fetch('/api/custodian/checklists?vessel_id=' + custVesselId, { headers: { 'x-auth-token': getToken() } });
+  const cls = await clRes.json();
+  const cl = cls.find(c => c.id === clId);
+  if (!cl) return;
+  cl.checks.push({
+    id: 'c' + Date.now().toString(36),
+    text, hint: '', answer_type: 'yes_no',
+    good_answer: 'YES', points: 10,
+    critical: false, auto_defect: true
+  });
+  await fetch('/api/custodian/checklists/' + clId, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', 'x-auth-token': getToken() },
+    body: JSON.stringify({ checks: cl.checks })
+  });
+  loadChecklistTemplates();
+  toast('Check added');
+}
+
+function editCheckItem(clId, idx) {
+  toast('Full check editor coming soon — use remove and add for now');
+}
+
+
+// ═══════════════════════════════════════════════════════
+// SIRE 2.0 MODULE
+// ═══════════════════════════════════════════════════════
+
+
+
+// ── Boot ───────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  if (getToken()) initApp();
+});
+</script>
+</body>
+</html>
