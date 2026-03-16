@@ -13723,7 +13723,8 @@ Return ONLY valid JSON in this exact format:
 
     const aiData = await aiRes.json();
     const text = aiData.content?.[0]?.text || '{}';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const clean = text.replace(/```json|```/g, '').trim();
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return res.status(500).json({ error: 'Could not parse AI response', raw: text.substring(0, 300) });
 
     const parsed = JSON.parse(jsonMatch[0]);
@@ -13841,7 +13842,8 @@ Return JSON:
     if (aiData.error) throw new Error(`AI API error: ${aiData.error.message || JSON.stringify(aiData.error)}`);
     const text = aiData.content?.[0]?.text;
     if (!text) throw new Error(`No response from AI — type: ${aiData.type || 'unknown'}, stop_reason: ${aiData.stop_reason || 'unknown'}`);
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const clean = text.replace(/```json|```/g, '').trim();
+    const jsonMatch = clean.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error(`AI response did not contain valid JSON. Raw: ${text.substring(0, 200)}`);
     const parsed = JSON.parse(jsonMatch[0]);
 
