@@ -9165,119 +9165,151 @@ function buildFindingCard(f, isOverdue, cls, source) {
   </div>`;
 }
 
-// ── CAP Section Parser ────────────────────────────────────────────────────────
-// Splits AI improved_cap text on well-known labels and renders each as a headed section.
+// CAP Section Parser v5
+// Splits AI improved_cap text into headed sections.
+// KEY RULES:
+//   (a) Longer labels before shorter (ROOT CAUSE ANALYSIS before ROOT CAUSE)
+//   (b) Overlapping matches deduplicated - longest label wins
+//   (c) Labels only match when at line-start AND followed by colon
 function formatCAPSections(text, theme) {
   if (!text) return '';
   const dark = theme === 'dark';
 
+  // IMPORTANT: longer labels must appear BEFORE shorter ones they contain.
   const LABELS = [
-    { key: 'ROOT CAUSE',              icon: '🔍', color: dark ? '#f87171' : '#dc2626', bc: '#f87171' },
-    { key: 'IMMEDIATE ACTION',        icon: '⚡', color: dark ? '#f59e0b' : '#d97706', bc: '#f59e0b' },
-    { key: 'CORRECTIVE ACTION',       icon: '🔧', color: dark ? '#60a5fa' : '#2563eb', bc: '#60a5fa' },
-    { key: 'SHORT-TERM',              icon: '📅', color: dark ? '#60a5fa' : '#2563eb', bc: '#60a5fa' },
-    { key: 'LONG-TERM',               icon: '🔁', color: dark ? '#a78bfa' : '#7c3aed', bc: '#a78bfa' },
-    { key: 'PREVENTIVE ACTION',       icon: '🛡',  color: dark ? '#34d399' : '#16a34a', bc: '#34d399' },
-    { key: 'SYSTEMIC ACTION',         icon: '🔄', color: dark ? '#c084fc' : '#9333ea', bc: '#c084fc' },
-    { key: 'FLEET ACTION',            icon: '🚢', color: dark ? '#fb923c' : '#ea580c', bc: '#fb923c' },
-    { key: 'EVIDENCE OF COMPLETION',  icon: '📁', color: dark ? '#a78bfa' : '#7c3aed', bc: '#a78bfa' },
+    { key: 'ROOT CAUSE ANALYSIS',         icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
+    { key: 'IMMEDIATE ACTION',            icon: '⚡', color: dark?'#f59e0b':'#d97706', bc:'#f59e0b' },
+    { key: 'SYSTEMIC CORRECTIVE ACTIONS', icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
+    { key: 'CORRECTIVE ACTION',           icon: '🔧', color: dark?'#60a5fa':'#2563eb', bc:'#60a5fa' },
+    { key: 'PREVENTATIVE ACTION',         icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'PREVENTIVE ACTION',           icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'SYSTEMIC ACTION',             icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
+    { key: 'ROOT CAUSE',                  icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
+    { key: 'FLEET ACTION',                icon: '🚢', color: dark?'#fb923c':'#ea580c', bc:'#fb923c' },
+    { key: 'EVIDENCE OF COMPLETION',      icon: '📁', color: dark?'#a78bfa':'#7c3aed', bc:'#a78bfa' },
+    { key: 'SHORT-TERM',                  icon: '📅', color: dark?'#60a5fa':'#2563eb', bc:'#60a5fa' },
+    { key: 'LONG-TERM',                   icon: '🔁', color: dark?'#a78bfa':'#7c3aed', bc:'#a78bfa' },
   ];
 
-  // Split text on label boundaries using simple string scanning
   const txtUp = text.toUpperCase();
-  let segments = []; // [{label, text}]
-  let lastIdx = 0;
-  let lastLabel = null;
 
-  // Find all label positions in order
-  let positions = [];
+  // Collect all candidate positions
+  let rawPositions = [];
   LABELS.forEach(function(lbl) {
-    let searchFrom = 0;
+    let s = 0;
     while (true) {
-      const pos = txtUp.indexOf(lbl.key, searchFrom);
+      const pos = txtUp.indexOf(lbl.key, s);
       if (pos === -1) break;
-      // Make sure it's at a word boundary (start of text, or preceded by newline/space/colon)
-      const prev = pos > 0 ? txtUp[pos - 1] : ' ';
-      const afterPos = pos + lbl.key.length; const afterCh = afterPos < txtUp.length ? txtUp[afterPos] : ':'; if ((pos === 0 || ' \\n\\r\\t:.)-'.indexOf(prev) !== -1) && ':( '.indexOf(afterCh) !== -1){       positions.push({ pos: pos, label: lbl });
+      // Must be at start of text or immediately after a newline
+      const prev = pos > 0 ? txtUp[pos - 1] : '\n';
+      const prevOk = pos === 0 || '\n\r'.indexOf(prev) !== -1;
+      // Must be followed (after optional spaces) by a colon
+      const afterIdx = pos + lbl.key.length;
+      const rest = afterIdx < txtUp.length ? txtUp.substring(afterIdx, afterIdx + 4).trimStart() : ':';
+      const afterOk = rest.charAt(0) === ':' || afterIdx >= txtUp.length;
+      if (prevOk && afterOk) {
+        rawPositions.push({ pos: pos, label: lbl, len: lbl.key.length });
       }
-      searchFrom = pos + 1;
+      s = pos + 1;
     }
   });
-  positions.sort(function(a, b) { return a.pos - b.pos; });
 
-  // If no labels found, return plain text
-  if (positions.length === 0) {
-    const bg = dark ? 'rgba(61,184,122,0.07)' : '#f8fafc';
-    const border = dark ? 'rgba(61,184,122,0.25)' : '#e2e8f0';
-    const col = dark ? 'var(--text)' : '#1e293b';
-    return '<div style="background:' + bg + ';border:1px solid ' + border + ';border-radius:5px;padding:12px 14px;font-size:11px;color:' + col + ';line-height:1.7;">' + text + '</div>';
+  // Sort by position
+  rawPositions.sort(function(a, b) { return a.pos - b.pos; });
+
+  // Deduplicate: if a match starts within the span of a previous match, skip it
+  // (since LABELS is ordered longest-first, the first at any position wins)
+  let positions = [];
+  rawPositions.forEach(function(p) {
+    const covered = positions.some(function(a) {
+      return p.pos >= a.pos && p.pos < a.pos + a.len;
+    });
+    if (!covered) positions.push(p);
+  });
+
+  // No labels found — plain block
+  if (!positions.length) {
+    const bg  = dark?'rgba(61,184,122,0.07)':'#f8fafc';
+    const bd  = dark?'rgba(61,184,122,0.25)':'#e2e8f0';
+    const col = dark?'var(--text)':'#1e293b';
+    return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;padding:12px 14px;font-size:11px;color:'+col+';line-height:1.7;">'+text+'</div>';
   }
 
-  // Extract segments between labels
+  // Build segments
   let segs = [];
-  // Text before first label (preamble)
   if (positions[0].pos > 0) {
     segs.push({ label: null, text: text.substring(0, positions[0].pos).trim() });
   }
   for (let i = 0; i < positions.length; i++) {
-    const start = positions[i].pos + positions[i].label.key.length;
+    // Strip label key + following colon + spaces from body start
+    const bodyStart = positions[i].pos + positions[i].label.key.length;
     const end = i + 1 < positions.length ? positions[i + 1].pos : text.length;
-    // Strip leading colon/dash/space
-    let body = text.substring(start, end).replace(/^[\s:\/\-]+/, '').trim();
+    const body = text.substring(bodyStart, end).replace(/^[\s:]+/, '').trim();
     segs.push({ label: positions[i].label, text: body });
   }
 
-  // Render
+  function h2r(hex) {
+    hex=hex.replace('#','');
+    if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join('');
+    const n=parseInt(hex,16);
+    return Math.floor(n/65536)+','+Math.floor((n%65536)/256)+','+(n%256);
+  }
+
   let html = '';
   segs.forEach(function(seg) {
     if (!seg.label) {
       if (seg.text) {
-        const col = dark ? 'var(--text-dim)' : '#64748b';
-        html += '<div style="font-size:11px;color:' + col + ';line-height:1.7;margin-bottom:8px;">' + seg.text + '</div>';
+        html += '<div style="font-size:11px;color:'+(dark?'var(--text-dim)':'#64748b')+';line-height:1.7;margin-bottom:8px;">'+seg.text+'</div>';
       }
       return;
     }
     const lbl = seg.label;
-    const bg = dark
-      ? 'rgba(' + hexToRgb(lbl.bc) + ',0.08)'
-      : 'rgba(' + hexToRgb(lbl.bc) + ',0.05)';
-    const txtCol = dark ? 'var(--text)' : '#1e293b';
+    const bg  = dark?'rgba('+h2r(lbl.bc)+',0.08)':'rgba('+h2r(lbl.bc)+',0.05)';
+    const tc  = dark?'var(--text)':'#1e293b';
 
-    // Detect numbered steps: text containing patterns like "1) " or "1. "
-    let bodyHtml = '';
-    const stepMatch = seg.text.match(/\d+[\).]\s+/);
-    if (stepMatch) {
-      const parts = seg.text.split(/(?=\d+[\).]\s+)/);
-      const numCol = dark ? 'var(--text-dim)' : '#64748b';
-      bodyHtml = '<ol style="margin:4px 0 0 0;padding-left:20px;font-size:11px;color:' + txtCol + ';line-height:1.75;">';
-      parts.forEach(function(p) {
-        const clean = p.replace(/^\d+[\).]\s+/, '').trim();
-        if (clean) bodyHtml += '<li style="margin-bottom:5px;">' + clean + '</li>';
+    // Detect numbered list — handles "1." "1)" "(1)" "(1." styles
+    // Split on lines starting with optional "(" then digit then "." or ")"
+    let bh = '';
+    const lines = seg.text.split('\n');
+    const isNumbered = lines.some(function(l) { return /^\s*\(?\d+[\).]/.test(l); });
+    if (isNumbered) {
+      // Reassemble and split on numbered boundaries
+      const parts = seg.text.split(/(?=\n\s*\(?\d+[\).])/).concat();
+      const items = [];
+      // Also handle inline numbered items (no newlines between them)
+      const inlineParts = seg.text.split(/(?=\(?\d+[\).]\s)/).filter(function(p){return p.trim().length > 0;});
+      const workParts = parts.length > 1 ? parts : inlineParts;
+      workParts.forEach(function(p) {
+        // Strip leading newlines, optional "(", digits, "." or ")", spaces
+        const clean = p.replace(/^[\n\s]*\(?\d+[\).]+\s*/, '').trim();
+        if (clean.length > 2) items.push(clean);
       });
-      bodyHtml += '</ol>';
+      if (items.length > 0) {
+        bh = '<ol style="margin:4px 0 0 0;padding-left:20px;font-size:11px;color:'+tc+';line-height:1.75;">';
+        items.forEach(function(it) { bh += '<li style="margin-bottom:5px;">'+it+'</li>'; });
+        bh += '</ol>';
+      } else {
+        bh = '<div style="font-size:11px;color:'+tc+';line-height:1.75;">'+seg.text+'</div>';
+      }
     } else {
-      bodyHtml = '<div style="font-size:11px;color:' + txtCol + ';line-height:1.75;">' + seg.text + '</div>';
+      bh = '<div style="font-size:11px;color:'+tc+';line-height:1.75;">'+seg.text+'</div>';
     }
 
-    html += '<div style="margin-bottom:10px;padding:10px 12px 10px 14px;background:' + bg
-      + ';border-left:3px solid ' + lbl.bc + ';border-radius:0 4px 4px 0;">'
-      + '<div style="font-size:9px;font-weight:700;color:' + lbl.color
-      + ';letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;">'
-      + lbl.icon + ' ' + lbl.key
-      + '</div>'
-      + bodyHtml
+    html += '<div style="margin-bottom:10px;padding:10px 12px 10px 14px;background:'+bg+';border-left:3px solid '+lbl.bc+';border-radius:0 4px 4px 0;">'
+      + '<div style="font-size:9px;font-weight:700;color:'+lbl.color+';letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;">'+lbl.icon+' '+lbl.key+'</div>'
+      + bh
       + '</div>';
   });
-
   return html;
 }
 
 function hexToRgb(hex) {
-  hex = hex.replace('#','');
-  if (hex.length === 3) hex = hex.split('').map(function(c){return c+c;}).join('');
-  const n = parseInt(hex, 16);
-  return Math.floor(n/65536) + ',' + Math.floor((n%65536)/256) + ',' + (n%256);
+  hex=hex.replace('#','');
+  if(hex.length===3)hex=hex.split('').map(function(c){return c+c;}).join('');
+  const n=parseInt(hex,16);
+  return Math.floor(n/65536)+','+Math.floor((n%65536)/256)+','+(n%256);
 }
+
 
 
 
