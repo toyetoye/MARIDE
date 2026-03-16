@@ -9198,8 +9198,7 @@ function formatCAPSections(text, theme) {
       if (pos === -1) break;
       // Make sure it's at a word boundary (start of text, or preceded by newline/space/colon)
       const prev = pos > 0 ? txtUp[pos - 1] : ' ';
-      if (pos === 0 || ' \n\r\t:.)-'.indexOf(prev) !== -1){
-        positions.push({ pos: pos, label: lbl });
+      const afterPos = pos + lbl.key.length; const afterCh = afterPos < txtUp.length ? txtUp[afterPos] : ':'; if ((pos === 0 || ' \\n\\r\\t:.)-'.indexOf(prev) !== -1) && ':( '.indexOf(afterCh) !== -1){       positions.push({ pos: pos, label: lbl });
       }
       searchFrom = pos + 1;
     }
