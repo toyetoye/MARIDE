@@ -13774,7 +13774,9 @@ Rate this CAP 1-5 and return JSON only:
           const aiData = await aiRes.json();
           const text = (aiData.content || []).find(c => c.type === 'text')?.text || '';
           const clean = text.replace(/```json|```/g, '').trim();
-          const review = JSON.parse(clean.match(/\{[\s\S]*\}/)[0]);
+          const batchMatch = clean.match(/\{[\s\S]*\}/);
+          if (!batchMatch) throw new Error('No JSON in AI response');
+          const review = JSON.parse(batchMatch[0]);
 
           // Save review to finding
           const db2 = readSireDB();
@@ -13836,8 +13838,11 @@ Return JSON:
       body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1500, messages: [{ role: 'user', content: prompt }] })
     });
     const aiData = await aiRes.json();
-    const text = aiData.content?.[0]?.text || '{}';
+    if (aiData.error) throw new Error(`AI API error: ${aiData.error.message || JSON.stringify(aiData.error)}`);
+    const text = aiData.content?.[0]?.text;
+    if (!text) throw new Error(`No response from AI — type: ${aiData.type || 'unknown'}, stop_reason: ${aiData.stop_reason || 'unknown'}`);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error(`AI response did not contain valid JSON. Raw: ${text.substring(0, 200)}`);
     const parsed = JSON.parse(jsonMatch[0]);
 
     // Optionally save review to finding
