@@ -9126,10 +9126,11 @@ function buildFindingCard(f, isOverdue, cls, source) {
         ${f.cap_status!=='closed'
           ? `<button class="btn-sm btn-sm-ghost" style="color:var(--green);font-size:9px;" onclick="closeFinding('${f.id}');${source==='fleet'?'loadFleetFindings()':'loadSireFindings()'}">✓ CLOSE</button>`
           : '<span style="font-family:var(--mono);font-size:9px;color:var(--green);">✓ CLOSED</span>'}
-        <button class="btn-sm btn-sm-ghost" style="font-size:9px;color:#c084fc;" onclick="reviewCAP('${f.id}','${source}')">
+        <button class="btn-sm btn-sm-ghost" style="font-size:9px;color:#c084fc;" onclick="reviewCAP('${f.id}','${source}',this)">
           ${rev ? '↻ RE-REVIEW' : '🤖 REVIEW CAP'}
         </button>
         <button class="btn-sm btn-sm-ghost" style="font-size:9px;" onclick="editCAP('${f.id}','${source}')">✎ EDIT CAP</button>
+        ${(getCurrentUser()?.role === 'admin') ? `<button class="btn-sm btn-sm-ghost" style="font-size:9px;color:var(--red);border-color:rgba(248,113,113,0.25);margin-top:4px;" onclick="deleteFinding('${f.id}','${source}')">🗑 DELETE</button>` : ''}
       </div>
     </div>
 
@@ -9448,6 +9449,21 @@ async function closeFinding(id) {
     body:JSON.stringify({cap_status:"closed",closed_at:new Date().toISOString()})});
   loadSireFindings();
   toast("CAP closed");
+}
+
+async function deleteFinding(id, source) {
+  if (!confirm('Delete this finding permanently? This cannot be undone.')) return;
+  try {
+    const res = await fetch(`/api/sire/finding/${id}`, {
+      method: 'DELETE', headers: { 'x-auth-token': getToken() }
+    }).then(r => r.json());
+    if (res.error) throw new Error(res.error);
+    toast('Finding deleted');
+    const card = document.getElementById('fc_' + id);
+    if (card) card.remove();
+    if (source === 'fleet') loadFleetFindings();
+    else loadSireFindings();
+  } catch(e) { toast('Delete failed: ' + e.message); }
 }
 
 
