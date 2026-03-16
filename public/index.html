@@ -9131,6 +9131,125 @@ function buildFindingCard(f, isOverdue, cls, source) {
   </div>`;
 }
 
+// ── CAP Section Parser ────────────────────────────────────────────────────────
+// Splits AI improved_cap text on well-known labels and renders each as a headed section.
+function formatCAPSections(text, theme) {
+  if (!text) return '';
+  const dark = theme === 'dark';
+
+  const LABELS = [
+    { key: 'ROOT CAUSE',              icon: '🔍', color: dark ? '#f87171' : '#dc2626', bc: '#f87171' },
+    { key: 'IMMEDIATE ACTION',        icon: '⚡', color: dark ? '#f59e0b' : '#d97706', bc: '#f59e0b' },
+    { key: 'CORRECTIVE ACTION',       icon: '🔧', color: dark ? '#60a5fa' : '#2563eb', bc: '#60a5fa' },
+    { key: 'SHORT-TERM',              icon: '📅', color: dark ? '#60a5fa' : '#2563eb', bc: '#60a5fa' },
+    { key: 'LONG-TERM',               icon: '🔁', color: dark ? '#a78bfa' : '#7c3aed', bc: '#a78bfa' },
+    { key: 'PREVENTIVE ACTION',       icon: '🛡',  color: dark ? '#34d399' : '#16a34a', bc: '#34d399' },
+    { key: 'SYSTEMIC ACTION',         icon: '🔄', color: dark ? '#c084fc' : '#9333ea', bc: '#c084fc' },
+    { key: 'FLEET ACTION',            icon: '🚢', color: dark ? '#fb923c' : '#ea580c', bc: '#fb923c' },
+    { key: 'EVIDENCE OF COMPLETION',  icon: '📁', color: dark ? '#a78bfa' : '#7c3aed', bc: '#a78bfa' },
+  ];
+
+  // Split text on label boundaries using simple string scanning
+  const txtUp = text.toUpperCase();
+  let segments = []; // [{label, text}]
+  let lastIdx = 0;
+  let lastLabel = null;
+
+  // Find all label positions in order
+  let positions = [];
+  LABELS.forEach(function(lbl) {
+    let searchFrom = 0;
+    while (true) {
+      const pos = txtUp.indexOf(lbl.key, searchFrom);
+      if (pos === -1) break;
+      // Make sure it's at a word boundary (start of text, or preceded by newline/space/colon)
+      const prev = pos > 0 ? txtUp[pos - 1] : ' ';
+      if (pos === 0 || /[
+
+\s:\.)]/.test(prev)) {
+        positions.push({ pos: pos, label: lbl });
+      }
+      searchFrom = pos + 1;
+    }
+  });
+  positions.sort(function(a, b) { return a.pos - b.pos; });
+
+  // If no labels found, return plain text
+  if (positions.length === 0) {
+    const bg = dark ? 'rgba(61,184,122,0.07)' : '#f8fafc';
+    const border = dark ? 'rgba(61,184,122,0.25)' : '#e2e8f0';
+    const col = dark ? 'var(--text)' : '#1e293b';
+    return '<div style="background:' + bg + ';border:1px solid ' + border + ';border-radius:5px;padding:12px 14px;font-size:11px;color:' + col + ';line-height:1.7;">' + text + '</div>';
+  }
+
+  // Extract segments between labels
+  let segs = [];
+  // Text before first label (preamble)
+  if (positions[0].pos > 0) {
+    segs.push({ label: null, text: text.substring(0, positions[0].pos).trim() });
+  }
+  for (let i = 0; i < positions.length; i++) {
+    const start = positions[i].pos + positions[i].label.key.length;
+    const end = i + 1 < positions.length ? positions[i + 1].pos : text.length;
+    // Strip leading colon/dash/space
+    let body = text.substring(start, end).replace(/^[\s:\/\-]+/, '').trim();
+    segs.push({ label: positions[i].label, text: body });
+  }
+
+  // Render
+  let html = '';
+  segs.forEach(function(seg) {
+    if (!seg.label) {
+      if (seg.text) {
+        const col = dark ? 'var(--text-dim)' : '#64748b';
+        html += '<div style="font-size:11px;color:' + col + ';line-height:1.7;margin-bottom:8px;">' + seg.text + '</div>';
+      }
+      return;
+    }
+    const lbl = seg.label;
+    const bg = dark
+      ? 'rgba(' + hexToRgb(lbl.bc) + ',0.08)'
+      : 'rgba(' + hexToRgb(lbl.bc) + ',0.05)';
+    const txtCol = dark ? 'var(--text)' : '#1e293b';
+
+    // Detect numbered steps: text containing patterns like "1) " or "1. "
+    let bodyHtml = '';
+    const stepMatch = seg.text.match(/\d+[\).]\s+/);
+    if (stepMatch) {
+      const parts = seg.text.split(/(?=\d+[\).]\s+)/);
+      const numCol = dark ? 'var(--text-dim)' : '#64748b';
+      bodyHtml = '<ol style="margin:4px 0 0 0;padding-left:20px;font-size:11px;color:' + txtCol + ';line-height:1.75;">';
+      parts.forEach(function(p) {
+        const clean = p.replace(/^\d+[\).]\s+/, '').trim();
+        if (clean) bodyHtml += '<li style="margin-bottom:5px;">' + clean + '</li>';
+      });
+      bodyHtml += '</ol>';
+    } else {
+      bodyHtml = '<div style="font-size:11px;color:' + txtCol + ';line-height:1.75;">' + seg.text + '</div>';
+    }
+
+    html += '<div style="margin-bottom:10px;padding:10px 12px 10px 14px;background:' + bg
+      + ';border-left:3px solid ' + lbl.bc + ';border-radius:0 4px 4px 0;">'
+      + '<div style="font-size:9px;font-weight:700;color:' + lbl.color
+      + ';letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;">'
+      + lbl.icon + ' ' + lbl.key
+      + '</div>'
+      + bodyHtml
+      + '</div>';
+  });
+
+  return html;
+}
+
+function hexToRgb(hex) {
+  hex = hex.replace('#','');
+  if (hex.length === 3) hex = hex.split('').map(function(c){return c+c;}).join('');
+  const n = parseInt(hex, 16);
+  return Math.floor(n/65536) + ',' + Math.floor((n%65536)/256) + ',' + (n%256);
+}
+
+
+
 function buildCAPReviewBlock(rev, fId, compact) {
   const scoreColor = rev.score_color==='green'?'var(--green)':rev.score_color==='amber'?'var(--amber)':'var(--red)';
   return `<div class="cap-review-box" style="margin-top:10px;">
@@ -9149,7 +9268,7 @@ function buildCAPReviewBlock(rev, fId, compact) {
       </div>`:''}
       ${rev.improved_cap?`<div class="cap-review-section">
         <div class="cap-review-label" style="color:var(--green);">✓ SUGGESTED IMPROVED CAP</div>
-        <div class="cap-improved-box">${rev.improved_cap}</div>
+        <div style="margin-top:6px;">${formatCAPSections(rev.improved_cap,'dark')}</div>
         <button class="btn-sm btn-sm-ghost" style="font-size:9px;margin-top:8px;color:var(--green);" onclick="applyImprovedCAP('${fId}',\`${rev.improved_cap.replace(/`/g,"'")}\`)">USE THIS CAP</button>
       </div>`:''}
       ${rev.systemic_action?`<div class="cap-review-section">
@@ -9672,10 +9791,13 @@ function fleetBuildReportHtml(findings, title) {
         weakHtml = '<div style="font-size:10px;color:#64748b;margin-bottom:6px;"><strong>Weaknesses:</strong> ' + rev.weaknesses.join(' · ') + '</div>';
       }
 
-      // Improved CAP
+      // Improved CAP — render with section headers
       let improvedHtml = '';
       if (rev.improved_cap) {
-        improvedHtml = '<div style="margin-top:6px;padding-top:6px;border-top:1px solid ' + sc + '33;font-size:10px;color:#1e293b;margin-bottom:6px;"><strong>Suggested CAP:</strong> ' + rev.improved_cap + '</div>';
+        improvedHtml = '<div style="margin-top:8px;padding-top:8px;border-top:1px solid ' + sc + '33;">'
+          + '<div style="font-size:9px;font-weight:700;color:' + sc + ';letter-spacing:1px;margin-bottom:8px;">✓ SUGGESTED IMPROVED CAP</div>'
+          + formatCAPSections(rev.improved_cap, 'light')
+          + '</div>';
       }
 
       // Evidence section — show documentary_evidence if present, else fall back to evidence_required
