@@ -9093,7 +9093,7 @@ function buildFindingCard(f, isOverdue, cls, source) {
         ${f.cap_status!=='closed'
           ? `<button class="btn-sm btn-sm-ghost" style="color:var(--green);font-size:9px;" onclick="closeFinding('${f.id}');${source==='fleet'?'loadFleetFindings()':'loadSireFindings()'}">✓ CLOSE</button>`
           : '<span style="font-family:var(--mono);font-size:9px;color:var(--green);">✓ CLOSED</span>'}
-        <button class="btn-sm btn-sm-ghost" style="font-size:9px;color:#c084fc;" onclick="reviewCAP('${f.id}','${source}')">
+        <button class="btn-sm btn-sm-ghost" style="font-size:9px;color:#c084fc;" onclick="reviewCAP('${f.id}','${source}',this)">
           ${rev ? '↻ RE-REVIEW' : '🤖 REVIEW CAP'}
         </button>
         <button class="btn-sm btn-sm-ghost" style="font-size:9px;" onclick="editCAP('${f.id}','${source}')">✎ EDIT CAP</button>
@@ -9179,20 +9179,26 @@ function toggleCAPReview(fId) {
   if (body) body.style.display = body.style.display==='none' ? '' : 'none';
 }
 
-async function reviewCAP(fId, source) {
-  const btn = event?.target;
+async function reviewCAP(fId, source, btnEl) {
+  const btn = btnEl || event?.currentTarget || event?.target;
   if (btn) { btn.textContent = '⏳ REVIEWING…'; btn.disabled = true; }
 
-  // Gather finding data from DOM
-  const card = document.getElementById('fc_'+fId);
-  const capText = document.getElementById('cap_action_'+fId)?.value
-    || card?.querySelector('[id^="cap_display_"]')?.textContent || '';
-
   try {
-    // Fetch latest finding data
-    const db = await fetch('/api/sire/findings?vessel_id='+sireVesselId, {headers:{'x-auth-token':getToken()}}).then(r=>r.json());
-    const all = await fetch('/api/sire/fleet-findings', {headers:{'x-auth-token':getToken()}}).then(r=>r.json()).catch(()=>({findings:[]}));
-    const f = (db.length?db:all.findings||[]).find(x=>x.id===fId) || {};
+    // Fetch finding — try vessel first, fall back to fleet
+    let f = null;
+    if (sireVesselId) {
+      const db = await fetch('/api/sire/findings?vessel_id='+sireVesselId, {headers:{'x-auth-token':getToken()}})
+        .then(r=>r.json()).catch(()=>[]);
+      f = (Array.isArray(db)?db:[]).find(x=>x.id===fId);
+    }
+    if (!f) {
+      const all = await fetch('/api/sire/fleet-findings', {headers:{'x-auth-token':getToken()}})
+        .then(r=>r.json()).catch(()=>({findings:[]}));
+      f = (all.findings||[]).find(x=>x.id===fId);
+    }
+    if (!f) throw new Error('Finding not found — try reloading');
+
+    const capText = document.getElementById('cap_action_'+fId)?.value?.trim() || f.corrective_action || '';
 
     const res = await fetch('/api/sire/review-cap', {
       method: 'POST',
@@ -9203,21 +9209,20 @@ async function reviewCAP(fId, source) {
         chapter: f.chapter || '',
         severity: f.severity || 'obs',
         root_cause: f.root_cause || '',
-        corrective_action: f.corrective_action || capText,
-        vessel_type: getSireVesselType()
+        corrective_action: capText,
+        vessel_type: getSireVesselType() || 'LPG Gas Carrier'
       })
     }).then(r=>r.json());
 
     if (res.error) throw new Error(res.error);
 
-    // Inject review block
     const reviewEl = document.getElementById('cap_review_'+fId);
     if (reviewEl) {
       reviewEl.innerHTML = buildCAPReviewBlock(res, fId, false);
-      reviewEl.style.display = '';
-      // Auto-expand
+      reviewEl.style.display = 'block';
       const body = document.getElementById('cap_review_body_'+fId);
       if (body) body.style.display = '';
+      reviewEl.scrollIntoView({behavior:'smooth', block:'nearest'});
     }
 
     if (btn) { btn.textContent = '↻ RE-REVIEW'; btn.disabled = false; }
