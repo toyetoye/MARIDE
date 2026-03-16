@@ -2791,58 +2791,58 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
       <!-- FLEET FINDINGS -->
       <div class="sire-section" id="ssec-fleet">
-        <!-- Row 1: Title + Action buttons -->
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
           <div>
             <div style="font-family:var(--cond);font-size:22px;font-weight:900;color:var(--text-bright);">FLEET FINDINGS</div>
             <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px;">All SIRE findings across the fleet — upload past inspection reports</div>
           </div>
-          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+          <!-- Filter row -->
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
+            <input id="fleetFilterInspector" placeholder="Inspector / company…" style="padding:5px 10px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);width:160px;" oninput="renderFleetFindings()">
+            <select id="fleetFilterChapter" onchange="renderFleetFindings()" style="padding:5px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+              <option value="">All Chapters</option>
+            </select>
+            <select id="fleetFilterSeverity" onchange="renderFleetFindings()" style="padding:5px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+              <option value="">All Severities</option>
+              <option value="major">Major</option>
+              <option value="minor">Minor</option>
+              <option value="obs">Observation</option>
+            </select>
+            <select id="fleetFilterVessel" onchange="renderFleetFindings()" style="padding:5px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+              <option value="">All Vessels</option>
+            </select>
+            <select id="fleetFilterStatus" onchange="renderFleetFindings()" style="padding:5px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+              <option value="">All Status</option>
+              <option value="open">Open</option>
+              <option value="closed">Closed</option>
+            </select>
+            <select id="fleetSortBy" onchange="renderFleetFindings()" style="padding:5px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+              <option value="date">Sort: Date</option>
+              <option value="chapter">Sort: Chapter</option>
+              <option value="severity">Sort: Severity</option>
+              <option value="vessel">Sort: Vessel</option>
+            </select>
+            <button class="btn-sm btn-sm-ghost" id="fleetClearFiltersBtn" onclick="fleetClearFilters()" style="font-size:9px;display:none;">✕ Clear filters</button>
+          </div>
+          <!-- Action row -->
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div id="fleetFilterSummary" style="font-family:var(--mono);font-size:9px;color:var(--amber);flex:1;"></div>
             <button class="btn-sm btn-sm-ghost" style="color:#c084fc;" id="fleetReviewAllBtn" onclick="fleetReviewAll()">🤖 REVIEW ALL CAPs</button>
             <button class="btn-sm btn-sm-ghost" style="color:#60a5fa;" onclick="fleetDownloadReport()">⬇ DOWNLOAD REPORT</button>
             <button class="btn-sm btn-sm-ghost" onclick="fleetEmailReport()">✉ EMAIL REPORT</button>
             <button class="btn-sm btn-sm-primary" onclick="showUploadPanel('single')">📄 UPLOAD REPORT</button>
             <button class="btn-sm btn-sm-ghost" onclick="showUploadPanel('bulk')">📦 BULK UPLOAD</button>
-            <button class="btn-sm btn-sm-ghost" title="Refresh" onclick="loadFleetFindings()">↻</button>
+            <button class="btn-sm btn-sm-ghost" onclick="loadFleetFindings()">↻</button>
           </div>
-        </div>
-        <!-- Row 2: Filters -->
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;">
-          <input id="fleetFilterInspector" placeholder="Inspector / company…" style="padding:4px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);width:150px;" oninput="renderFleetFindings()">
-          <select id="fleetFilterChapter" onchange="renderFleetFindings()" style="padding:4px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-            <option value="">All Chapters</option>
-          </select>
-          <select id="fleetFilterSeverity" onchange="renderFleetFindings()" style="padding:4px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-            <option value="">All Severities</option>
-            <option value="major">Major</option>
-            <option value="minor">Minor</option>
-            <option value="obs">Observation</option>
-          </select>
-          <select id="fleetFilterVessel" onchange="renderFleetFindings()" style="padding:4px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-            <option value="">All Vessels</option>
-          </select>
-          <select id="fleetFilterStatus" onchange="renderFleetFindings()" style="padding:4px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-            <option value="">All Status</option>
-            <option value="open">Open</option>
-            <option value="closed">Closed</option>
-          </select>
-          <select id="fleetSortBy" onchange="renderFleetFindings()" style="padding:4px 8px;font-size:11px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-            <option value="date">Sort: Date</option>
-            <option value="chapter">Sort: Chapter</option>
-            <option value="severity">Sort: Severity</option>
-            <option value="vessel">Sort: Vessel</option>
-          </select>
-          <div id="fleetFilterSummary" style="font-family:var(--mono);font-size:9px;color:var(--amber);flex:1;"></div>
-          <button class="btn-sm btn-sm-ghost" id="fleetClearFiltersBtn" onclick="fleetClearFilters()" style="font-size:9px;display:none;">✕ Clear filters</button>
         </div>
         <!-- Upload panel -->
         <div id="uploadPanel" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:20px;">
 
           <!-- Mode tabs -->
-          <div style="display:flex;align-items:center;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:12px;">
+          <div style="display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:12px;">
             <button class="sire-status-btn sel-ready" id="uploadTabSingle" onclick="switchUploadTab('single')">📄 UPLOAD REPORT</button>
             <button class="sire-status-btn" id="uploadTabBulk" onclick="switchUploadTab('bulk')">📦 BULK UPLOAD</button>
-            <button class="btn-sm btn-sm-ghost" style="margin-left:auto;color:var(--red);border-color:rgba(248,113,113,0.3);" onclick="document.getElementById('uploadPanel').style.display='none'">✕ CANCEL</button>
+            <button class="btn-sm btn-sm-ghost" style="margin-left:auto;" onclick="document.getElementById('uploadPanel').style.display='none'">✕ CLOSE</button>
           </div>
 
           <!-- SINGLE REPORT UPLOAD -->
@@ -9093,11 +9093,10 @@ function buildFindingCard(f, isOverdue, cls, source) {
         ${f.cap_status!=='closed'
           ? `<button class="btn-sm btn-sm-ghost" style="color:var(--green);font-size:9px;" onclick="closeFinding('${f.id}');${source==='fleet'?'loadFleetFindings()':'loadSireFindings()'}">✓ CLOSE</button>`
           : '<span style="font-family:var(--mono);font-size:9px;color:var(--green);">✓ CLOSED</span>'}
-        <button class="btn-sm btn-sm-ghost" style="font-size:9px;color:#c084fc;" onclick="reviewCAP('${f.id}','${source}',this)">
+        <button class="btn-sm btn-sm-ghost" style="font-size:9px;color:#c084fc;" onclick="reviewCAP('${f.id}','${source}')">
           ${rev ? '↻ RE-REVIEW' : '🤖 REVIEW CAP'}
         </button>
         <button class="btn-sm btn-sm-ghost" style="font-size:9px;" onclick="editCAP('${f.id}','${source}')">✎ EDIT CAP</button>
-        ${(getCurrentUser()?.role === 'admin') ? `<button class="btn-sm btn-sm-ghost" style="font-size:9px;color:var(--red);border-color:rgba(248,113,113,0.25);margin-top:4px;" onclick="deleteFinding('${f.id}','${source}')">🗑 DELETE</button>` : ''}
       </div>
     </div>
 
@@ -9161,6 +9160,13 @@ function buildCAPReviewBlock(rev, fId, compact) {
         <div class="cap-review-label">📁 EVIDENCE REQUIRED TO CLOSE</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;">${rev.evidence_required.map(e=>`<span style="background:var(--surface2);padding:2px 8px;border-radius:3px;font-size:10px;">📄 ${e}</span>`).join('')}</div>
       </div>`:''}
+      ${rev.documentary_evidence?`<div class="cap-review-section" style="border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;padding-top:12px;">
+        <div class="cap-review-label" style="color:#34d399;">📋 DOCUMENTARY EVIDENCE GUIDE</div>
+        ${(rev.documentary_evidence.immediate||[]).length?`<div style="margin-top:8px;"><div style="font-size:9px;font-weight:700;color:#f59e0b;letter-spacing:1px;margin-bottom:5px;">⚡ IMMEDIATE — Must exist now</div>${(rev.documentary_evidence.immediate||[]).map(e=>`<div style="font-size:10px;color:var(--text);padding:3px 0 3px 10px;border-left:2px solid #f59e0b;margin-bottom:3px;">📄 ${e}</div>`).join('')}</div>`:''}
+        ${(rev.documentary_evidence.ongoing||[]).length?`<div style="margin-top:8px;"><div style="font-size:9px;font-weight:700;color:#60a5fa;letter-spacing:1px;margin-bottom:5px;">🔄 ONGOING — Maintain going forward</div>${(rev.documentary_evidence.ongoing||[]).map(e=>`<div style="font-size:10px;color:var(--text);padding:3px 0 3px 10px;border-left:2px solid #60a5fa;margin-bottom:3px;">📄 ${e}</div>`).join('')}</div>`:''}
+        ${(rev.documentary_evidence.objective_evidence||[]).length?`<div style="margin-top:8px;"><div style="font-size:9px;font-weight:700;color:#34d399;letter-spacing:1px;margin-bottom:5px;">🔍 OBJECTIVE EVIDENCE — Inspector will physically verify</div>${(rev.documentary_evidence.objective_evidence||[]).map(e=>`<div style="font-size:10px;color:var(--text);padding:3px 0 3px 10px;border-left:2px solid #34d399;margin-bottom:3px;">📄 ${e}</div>`).join('')}</div>`:''}
+        ${rev.documentary_evidence.retention_period?`<div style="margin-top:8px;font-size:10px;color:var(--text-dim);">🗓 Retention: ${rev.documentary_evidence.retention_period}</div>`:''}
+      </div>`:''}
       ${rev.timeline_suggestion?`<div class="cap-review-section">
         <div class="cap-review-label">⏱ SUGGESTED TIMELINE</div>
         <div style="font-size:11px;color:var(--text);">${rev.timeline_suggestion}</div>
@@ -9179,26 +9185,20 @@ function toggleCAPReview(fId) {
   if (body) body.style.display = body.style.display==='none' ? '' : 'none';
 }
 
-async function reviewCAP(fId, source, btnEl) {
-  const btn = btnEl || event?.currentTarget || event?.target;
+async function reviewCAP(fId, source) {
+  const btn = event?.target;
   if (btn) { btn.textContent = '⏳ REVIEWING…'; btn.disabled = true; }
 
-  try {
-    // Fetch finding — try vessel first, fall back to fleet
-    let f = null;
-    if (sireVesselId) {
-      const db = await fetch('/api/sire/findings?vessel_id='+sireVesselId, {headers:{'x-auth-token':getToken()}})
-        .then(r=>r.json()).catch(()=>[]);
-      f = (Array.isArray(db)?db:[]).find(x=>x.id===fId);
-    }
-    if (!f) {
-      const all = await fetch('/api/sire/fleet-findings', {headers:{'x-auth-token':getToken()}})
-        .then(r=>r.json()).catch(()=>({findings:[]}));
-      f = (all.findings||[]).find(x=>x.id===fId);
-    }
-    if (!f) throw new Error('Finding not found — try reloading');
+  // Gather finding data from DOM
+  const card = document.getElementById('fc_'+fId);
+  const capText = document.getElementById('cap_action_'+fId)?.value
+    || card?.querySelector('[id^="cap_display_"]')?.textContent || '';
 
-    const capText = document.getElementById('cap_action_'+fId)?.value?.trim() || f.corrective_action || '';
+  try {
+    // Fetch latest finding data
+    const db = await fetch('/api/sire/findings?vessel_id='+sireVesselId, {headers:{'x-auth-token':getToken()}}).then(r=>r.json());
+    const all = await fetch('/api/sire/fleet-findings', {headers:{'x-auth-token':getToken()}}).then(r=>r.json()).catch(()=>({findings:[]}));
+    const f = (db.length?db:all.findings||[]).find(x=>x.id===fId) || {};
 
     const res = await fetch('/api/sire/review-cap', {
       method: 'POST',
@@ -9209,20 +9209,21 @@ async function reviewCAP(fId, source, btnEl) {
         chapter: f.chapter || '',
         severity: f.severity || 'obs',
         root_cause: f.root_cause || '',
-        corrective_action: capText,
-        vessel_type: getSireVesselType() || 'LPG Gas Carrier'
+        corrective_action: f.corrective_action || capText,
+        vessel_type: getSireVesselType()
       })
     }).then(r=>r.json());
 
     if (res.error) throw new Error(res.error);
 
+    // Inject review block
     const reviewEl = document.getElementById('cap_review_'+fId);
     if (reviewEl) {
       reviewEl.innerHTML = buildCAPReviewBlock(res, fId, false);
-      reviewEl.style.display = 'block';
+      reviewEl.style.display = '';
+      // Auto-expand
       const body = document.getElementById('cap_review_body_'+fId);
       if (body) body.style.display = '';
-      reviewEl.scrollIntoView({behavior:'smooth', block:'nearest'});
     }
 
     if (btn) { btn.textContent = '↻ RE-REVIEW'; btn.disabled = false; }
@@ -9290,24 +9291,6 @@ async function saveFinding() {
   closeModal("findingModal");
   loadSireFindings();
   toast("Finding logged");
-}
-
-async function deleteFinding(id, source) {
-  if (!confirm('Delete this finding permanently? This cannot be undone.')) return;
-  try {
-    const res = await fetch(`/api/sire/finding/${id}`, {
-      method: 'DELETE',
-      headers: { 'x-auth-token': getToken() }
-    }).then(r => r.json());
-    if (res.error) throw new Error(res.error);
-    toast('Finding deleted');
-    const card = document.getElementById('fc_' + id);
-    if (card) card.remove();
-    if (source === 'fleet') loadFleetFindings();
-    else loadSireFindings();
-  } catch(e) {
-    toast('Delete failed: ' + e.message, 'error');
-  }
 }
 
 async function closeFinding(id) {
@@ -9690,6 +9673,13 @@ function fleetBuildReportHtml(findings, title) {
           <div style="font-size:11px;color:#1e293b;margin-bottom:${rev.weaknesses?.length?'6px':'0'}">${rev.verdict||''}</div>
           ${rev.weaknesses?.length?`<div style="font-size:10px;color:#64748b;margin-bottom:6px;"><strong>Weaknesses:</strong> ${rev.weaknesses.join(' · ')}</div>`:''}
           ${rev.improved_cap?`<div style="margin-top:6px;padding-top:6px;border-top:1px solid ${scoreColor(rev.score_color)}33;font-size:10px;color:#1e293b;margin-bottom:6px;"><strong>Suggested CAP:</strong> ${rev.improved_cap}</div>`:''}
+          ${rev.documentary_evidence?`<div style="margin-top:8px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;">
+            <div style="font-size:9px;font-weight:700;color:#166534;letter-spacing:1px;margin-bottom:8px;">📋 DOCUMENTARY EVIDENCE GUIDE</div>
+            ${(rev.documentary_evidence.immediate||[]).length?`<div style="margin-bottom:6px;"><div style="font-size:8px;font-weight:700;color:#92400e;margin-bottom:3px;">⚡ IMMEDIATE — Must exist now</div>${(rev.documentary_evidence.immediate||[]).map(e=>`<div style="font-size:10px;color:#1e293b;padding:2px 0 2px 8px;border-left:2px solid #f59e0b;margin-bottom:2px;">📄 ${e}</div>`).join('')}</div>`:''}
+            ${(rev.documentary_evidence.ongoing||[]).length?`<div style="margin-bottom:6px;"><div style="font-size:8px;font-weight:700;color:#1e40af;margin-bottom:3px;">🔄 ONGOING — Maintain going forward</div>${(rev.documentary_evidence.ongoing||[]).map(e=>`<div style="font-size:10px;color:#1e293b;padding:2px 0 2px 8px;border-left:2px solid #3b82f6;margin-bottom:2px;">📄 ${e}</div>`).join('')}</div>`:''}
+            ${(rev.documentary_evidence.objective_evidence||[]).length?`<div style="margin-bottom:6px;"><div style="font-size:8px;font-weight:700;color:#166534;margin-bottom:3px;">🔍 OBJECTIVE EVIDENCE — Inspector will physically verify</div>${(rev.documentary_evidence.objective_evidence||[]).map(e=>`<div style="font-size:10px;color:#1e293b;padding:2px 0 2px 8px;border-left:2px solid #16a34a;margin-bottom:2px;">📄 ${e}</div>`).join('')}</div>`:''}
+            ${rev.documentary_evidence.retention_period?`<div style="font-size:9px;color:#64748b;margin-top:4px;">🗓 Retention: ${rev.documentary_evidence.retention_period}</div>`:''}
+          </div>`:''}
           ${rev.inspector_response?`<div style="margin-top:8px;padding-top:8px;border-top:1px solid #bfdbfe;background:#eff6ff;border-radius:4px;padding:10px 12px;">
             <div style="font-size:9px;font-weight:700;color:#1d4ed8;letter-spacing:1px;margin-bottom:6px;">✉ PROPOSED INSPECTOR RESPONSE</div>
             <div style="font-size:11px;color:#1e293b;line-height:1.7;white-space:pre-wrap;">${rev.inspector_response}</div>
@@ -9704,17 +9694,25 @@ function fleetBuildReportHtml(findings, title) {
     @media print { body { margin: 0; } .no-print { display: none; } }
   </style></head><body>
   <div style="max-width:860px;margin:0 auto;padding:32px 24px;">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #1e293b;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #1A3C6E;">
       <div>
         <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#64748b;margin-bottom:4px;">FORCAP — FLEET OPERATIONS, RISK, COMPLIANCE & AUDIT PLATFORM</div>
-        <div style="font-size:22px;font-weight:700;color:#1e293b;">${title || 'SIRE Fleet Findings Report'}</div>
+        <div style="font-size:22px;font-weight:700;color:#1A3C6E;">${title || 'SIRE Fleet Findings Report'}</div>
         <div style="font-size:11px;color:#64748b;margin-top:4px;">Generated: ${now}</div>
       </div>
-      <div style="text-align:right;">
-        <div style="font-size:11px;color:#64748b;">Total findings: <strong>${findings.length}</strong></div>
-        <div style="font-size:11px;color:#d97706;">Open CAPs: <strong>${open}</strong></div>
-        <div style="font-size:11px;color:#dc2626;">Major: <strong>${major}</strong> · Overdue: <strong>${overdue}</strong></div>
-        <div style="font-size:11px;color:#64748b;margin-top:2px;">AI reviewed: ${reviewed}/${findings.length}</div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+        <svg width="130" height="48" viewBox="0 0 130 48" xmlns="http://www.w3.org/2000/svg">
+          <rect width="130" height="48" rx="5" fill="#1A3C6E"/>
+          <text x="65" y="20" font-family="Arial,sans-serif" font-size="14" font-weight="900" fill="#5EB130" text-anchor="middle" letter-spacing="3">NSML</text>
+          <line x1="12" y1="25" x2="118" y2="25" stroke="#5EB130" stroke-width="0.8" opacity="0.5"/>
+          <text x="65" y="37" font-family="Arial,sans-serif" font-size="6" fill="#ffffff" text-anchor="middle" letter-spacing="1" opacity="0.85">NIGERIAN SHIPS MANAGEMENT LTD</text>
+        </svg>
+        <div style="text-align:right;">
+          <div style="font-size:11px;color:#64748b;">Total findings: <strong>${findings.length}</strong></div>
+          <div style="font-size:11px;color:#d97706;">Open CAPs: <strong>${open}</strong></div>
+          <div style="font-size:11px;color:#dc2626;">Major: <strong>${major}</strong> · Overdue: <strong>${overdue}</strong></div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px;">AI reviewed: ${reviewed}/${findings.length}</div>
+        </div>
       </div>
     </div>
     ${rows}
@@ -9765,6 +9763,9 @@ function fleetEmailReport() {
       `   ${f.description||''}`,
       f.corrective_action ? `   CAP: ${f.corrective_action}` : '   CAP: Not provided',
       f.cap_review ? `   AI Score: ${f.cap_review.score}/5 — ${f.cap_review.verdict||''}` : '',
+      f.cap_review?.documentary_evidence?.immediate?.length ? `   📄 Immediate evidence needed: ${f.cap_review.documentary_evidence.immediate.slice(0,2).join('; ')}` : '',
+      f.cap_review?.documentary_evidence?.objective_evidence?.length ? `   🔍 Inspector will verify: ${f.cap_review.documentary_evidence.objective_evidence.slice(0,2).join('; ')}` : '',
+      f.cap_review?.documentary_evidence?.retention_period ? `   🗓 Retention: ${f.cap_review.documentary_evidence.retention_period}` : '',
       ''
     ].filter(Boolean).join('\n'))
   ];
