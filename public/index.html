@@ -9392,7 +9392,8 @@ async function reviewCAP(fId, source) {
         severity: f.severity || 'obs',
         root_cause: f.root_cause || '',
         corrective_action: f.corrective_action || capText,
-        vessel_type: getSireVesselType()
+        vessel_type: getSireVesselType(),
+        vessel_id: f.vessel_id || sireVesselId || ''
       })
     }).then(r=>r.json());
 
