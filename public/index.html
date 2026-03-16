@@ -4337,6 +4337,7 @@ tick(); setInterval(tick, 1000);
 
 // Load investigations on startup
 window.addEventListener('DOMContentLoaded', () => {
+  initTheme();
   initAuth();
 });
 
@@ -6250,52 +6251,60 @@ function getCurrentUser() {
 
 async function initAuth() {
   const token = getToken();
+
+  // ── Step 1: Render the UI immediately using whatever is cached ───────────
+  // This ensures the app is NEVER stuck on a blank screen waiting for the server.
+  const cachedUser = getCurrentUser();
   if (!token) {
-    // Only redirect if we're not already on login page
+    // No token at all — go to login
     if (!window.location.pathname.includes('login')) {
       window.location.href = '/login.html';
     }
     return;
   }
 
+  // We have a token — show the app right away with cached user data
+  if (cachedUser) {
+    applyUserUI(cachedUser);
+  } else {
+    document.getElementById('userAvatar').textContent = '…';
+    document.getElementById('userName').textContent = 'Loading';
+  }
+  loadInvestigationList();
+  loadVesselDropdown();
+  showView('home');
+
+  // ── Step 2: Verify token with server in background (5s timeout) ──────────
   try {
-    // 10-second timeout — Render free tier cold starts can be slow
     const controller = new AbortController();
-    const authTimeout = setTimeout(() => controller.abort(), 10000);
+    const t = setTimeout(() => controller.abort(), 5000);
     const res = await fetch('/api/auth/me', {
       headers: { 'x-auth-token': token },
       signal: controller.signal
     });
-    clearTimeout(authTimeout);
+    clearTimeout(t);
+
     if (!res.ok) {
-      // Token invalid — clear and go to login, but prevent loop
+      // Token expired — clear and redirect to login
       localStorage.removeItem('maride_token');
       localStorage.removeItem('maride_user');
-      if (!window.location.pathname.includes('login')) {
-        window.location.href = '/login.html';
-      }
+      window.location.href = '/login.html';
       return;
     }
+
+    // Got fresh user data — patch the UI silently
     const user = await res.json();
     localStorage.setItem('maride_user', JSON.stringify(user));
     applyUserUI(user);
-    loadInvestigationList();
-    loadVesselDropdown();
-    showView('home');
+
   } catch(e) {
-    // Network error / Render cold start — don't redirect, show app with cached user
-    console.warn('Auth check failed (network?):', e.message);
-    const cachedUser = getCurrentUser();
-    if (cachedUser) {
-      applyUserUI(cachedUser);
-    } else {
-      // No cached user — set a placeholder so the UI isn't stuck on "?"
+    // Server unreachable (cold start / offline) — UI is already showing, just log it
+    console.warn('Background auth check failed:', e.message);
+    // If we have no cached user at all, show an offline badge
+    if (!cachedUser) {
       document.getElementById('userAvatar').textContent = '?';
       document.getElementById('userName').textContent = 'Offline';
     }
-    loadInvestigationList();
-    loadVesselDropdown();
-    showView('home');
   }
 }
 
@@ -6787,16 +6796,27 @@ document.querySelectorAll('.modal-backdrop').forEach(el => {
 // ═══════════════════════════════════════════════════════
 async function loadHomeDashboard() {
   const body = document.getElementById('homeBody');
+  // Show loading state immediately so the panel never appears blank
+  body.innerHTML = '<div style="padding:40px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text-dim);">⏳ LOADING DASHBOARD…</div>';
   try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
     const [invRes, vesselRes] = await Promise.all([
-      fetch('/api/investigations', { headers: { 'x-auth-token': getToken() } }),
-      fetch('/api/vessels',        { headers: { 'x-auth-token': getToken() } })
+      fetch('/api/investigations', { headers: { 'x-auth-token': getToken() }, signal: ctrl.signal }),
+      fetch('/api/vessels',        { headers: { 'x-auth-token': getToken() }, signal: ctrl.signal })
     ]);
+    clearTimeout(t);
     const investigations = await invRes.json();
     const vessels        = await vesselRes.json();
     renderHomeDashboard(investigations, vessels, body);
   } catch(e) {
-    body.innerHTML = `<div style="padding:40px;text-align:center;color:var(--red);font-family:var(--mono);">Could not load dashboard: ${e.message}</div>`;
+    const isTimeout = e.name === 'AbortError';
+    body.innerHTML = `<div style="padding:40px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text-dim);">
+      <div style="font-size:24px;margin-bottom:12px;">${isTimeout ? '🕐' : '⚠'}</div>
+      <div style="color:var(--amber);margin-bottom:8px;">${isTimeout ? 'SERVER WARMING UP…' : 'COULD NOT REACH SERVER'}</div>
+      <div style="color:var(--text-dim);margin-bottom:16px;">${isTimeout ? 'Render free tier may take up to 30 seconds on first load.' : e.message}</div>
+      <button onclick="loadHomeDashboard()" style="padding:8px 20px;background:var(--amber);color:#000;border:none;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;letter-spacing:1px;">↻ RETRY</button>
+    </div>`;
   }
 }
 
