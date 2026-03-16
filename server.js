@@ -1048,7 +1048,7 @@ Return ONLY valid JSON:
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
     });
 
     const aiData = await aiRes.json();
@@ -1779,7 +1779,56 @@ Rate this CAP 1-5 and return JSON only:
 app.post('/api/sire/review-cap', requireAuth, async (req, res) => {
   if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'API key not configured' });
   try {
-    const { finding_id, description, chapter, severity, root_cause, corrective_action, vessel_type } = req.body;
+    const { finding_id, description, chapter, severity, root_cause, corrective_action, vessel_type, vessel_id } = req.body;
+
+    // ── Pull relevant IMS/SMS procedures from Knowledge Repository ──────────
+    let imsContext = '';
+    try {
+      const repoDb = readRepoDb();
+      const manuals = repoDb.manuals.filter(m => !m.superseded);
+
+      const keywords = [
+        ...(description || '').toLowerCase().split(/\s+/).filter(w => w.length > 4),
+        ...(chapter || '').toLowerCase().split(/[\s-]+/).filter(w => w.length > 1),
+        'sms', 'procedure', 'maintenance', 'inspection', 'safety'
+      ];
+
+      const scored = manuals.map(m => {
+        let score = 0;
+        const meta = ((m.filename||'') + ' ' + (m.summary||'') + ' ' + (m.category||'') + ' ' + (m.equipment_name||'')).toLowerCase();
+        keywords.forEach(w => { if (meta.includes(w)) score += 2; });
+        if (/ims|sms|safety.management|procedure/i.test(m.filename)) score += 5;
+        if (vessel_id && m.vessel_id && m.vessel_id !== vessel_id) score -= 3;
+        if (m.text_extracted) score += 1;
+        return { m, score };
+      }).filter(s => s.score > 0).sort((a, b) => b.score - a.score);
+
+      const top = scored.slice(0, 3);
+      const imsParts = [];
+      for (const { m } of top) {
+        const sidecar = loadSidecarText(m.stored_name, path.join(DATA_DIR, 'uploads'));
+        if (sidecar) {
+          const kw = keywords.join('|');
+          const re = new RegExp(kw, 'i');
+          let bestChunk = sidecar.substring(0, 2000);
+          let bestScore = 0;
+          const WINDOW = 3000, STEP = 500;
+          for (let pos = 0; pos < Math.min(sidecar.length - WINDOW, 80000); pos += STEP) {
+            const window = sidecar.substring(pos, pos + WINDOW);
+            const matchCount = (window.match(re) || []).length;
+            if (matchCount > bestScore) { bestScore = matchCount; bestChunk = window; }
+          }
+          imsParts.push(`--- ${m.filename} (${m.category}) ---\n${bestChunk.substring(0, 2500)}`);
+        } else {
+          imsParts.push(`--- ${m.filename} (${m.category}) [text not extracted — summary: ${m.summary || 'N/A'}] ---`);
+        }
+      }
+      if (imsParts.length > 0) {
+        imsContext = `\n\nRELEVANT IMS/SMS PROCEDURES FROM KNOWLEDGE REPOSITORY:\n${imsParts.join('\n\n')}`;
+      }
+    } catch(imsErr) {
+      console.warn('IMS lookup failed (non-fatal):', imsErr.message);
+    }
 
     const prompt = `You are a senior maritime SIRE 2.0 expert and DPA reviewing corrective action plans for vessel deficiencies.
 
@@ -1788,14 +1837,16 @@ Chapter: ${chapter}
 Severity: ${severity}
 Finding: ${description}
 Root Cause: ${root_cause || 'Not stated'}
-Proposed Corrective Action: ${corrective_action || 'None provided'}
+Proposed Corrective Action: ${corrective_action || 'None provided'}${imsContext}
 
 Evaluate this CAP against SIRE 2.0 standards. A good CAP must:
 1. Directly address the root cause (not just the symptom)
-2. Be specific and measurable
+2. Be specific and measurable — reference specific IMS/SMS procedure numbers and section titles from the documents provided above where relevant
 3. Include systemic prevention
-4. Reference the specific procedure/SMS element to be updated
+4. Reference the EXACT procedure title and section from the IMS/SMS provided — do not use placeholder references like [SMS Ref XX]; use the actual document name and section if visible in the provided text
 5. Be realistic and achievable
+
+IMPORTANT: When writing the improved_cap and inspector_response, cite specific procedure names and section numbers from the IMS/SMS documents provided above. If no relevant IMS section was found in the provided text, note which type of procedure should be updated.
 
 Return JSON only (no markdown fences):
 {
