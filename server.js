@@ -1559,9 +1559,22 @@ app.post('/api/sire/upload-findings', requireAuth, (req, res) => {
     db.findings = db.findings || [];
     const { findings } = req.body;
     if (!Array.isArray(findings)) return res.status(400).json({ error: 'findings must be an array' });
-    let imported = 0, skipped = 0;
+
+    let imported = 0, skipped = 0, duplicates = 0;
     findings.forEach(f => {
       if (!f.description) { skipped++; return; }
+
+      // Duplicate detection: same vessel + same description (normalised) + same inspection_date
+      const descNorm = (f.description || '').trim().toLowerCase().substring(0, 80);
+      const isDuplicate = db.findings.some(existing => {
+        const existingDescNorm = (existing.description || '').trim().toLowerCase().substring(0, 80);
+        return existing.vessel_id === f.vessel_id
+          && existingDescNorm === descNorm
+          && existing.inspection_date === f.inspection_date;
+      });
+
+      if (isDuplicate) { duplicates++; return; }
+
       db.findings.push({
         id: 'sf_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2,5),
         ...f,
@@ -1574,7 +1587,7 @@ app.post('/api/sire/upload-findings', requireAuth, (req, res) => {
       imported++;
     });
     writeSireDB(db);
-    res.json({ ok: true, imported, skipped });
+    res.json({ ok: true, imported, skipped, duplicates });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1657,7 +1670,33 @@ Return ONLY valid JSON:
     if (inspector_override) parsed.inspector = inspector_override;
     if (company_override)   parsed.inspecting_company = company_override;
     if (date_override)      parsed.inspection_date = date_override;
-    res.json({ ok: true, vessel_id, ...parsed });
+
+    // Duplicate report detection — check if this inspection has already been imported
+    const sireDb = readSireDB();
+    const existingFindings = sireDb.findings || [];
+    const inspDate = parsed.inspection_date;
+    const inspCompany = (parsed.inspecting_company || '').toLowerCase();
+
+    let duplicateReport = false;
+    let duplicateCount = 0;
+    if (vessel_id && inspDate) {
+      // Count how many findings already exist for this vessel + inspection date
+      duplicateCount = existingFindings.filter(f =>
+        f.vessel_id === vessel_id && f.inspection_date === inspDate
+      ).length;
+      if (duplicateCount > 0) duplicateReport = true;
+    }
+
+    res.json({
+      ok: true,
+      vessel_id,
+      ...parsed,
+      duplicate_report: duplicateReport,
+      duplicate_count: duplicateCount,
+      duplicate_warning: duplicateReport
+        ? `⚠ ${duplicateCount} finding(s) from this inspection date (${inspDate}) already exist for this vessel. Importing again will skip duplicates.`
+        : null
+    });
   } catch(e) {
     console.error('Parse report error:', e);
     res.status(500).json({ error: e.message });
@@ -1768,16 +1807,22 @@ Return JSON only (no markdown fences):
   "weaknesses": ["What is missing or inadequate"],
   "improved_cap": "A fully rewritten, SIRE-ready corrective action",
   "systemic_action": "The systemic/SMS-level action needed to prevent recurrence",
-  "timeline_suggestion": "Realistic timeframe",
-  "evidence_required": ["Documents needed to demonstrate closure"],
-  "inspector_response": "A formal 2-3 paragraph response in professional maritime language, suitable for direct submission to OCIMF/the inspector. Acknowledge the finding, state the immediate corrective action taken, describe systemic/preventive measures, and confirm evidence available."
+  "timeline_suggestion": "Realistic timeframe e.g. 14 days, 30 days",
+  "evidence_required": ["Broad list of documents needed to demonstrate closure to inspector"],
+  "documentary_evidence": {
+    "immediate": ["Specific records or documents that must exist RIGHT NOW to demonstrate immediate corrective action was taken — e.g. signed checklist, updated log entry, repair record, work order"],
+    "ongoing": ["Records that must be maintained going forward to show systemic prevention is in place — e.g. updated procedure with revision date, monthly inspection records, training certificates for all watchkeepers"],
+    "objective_evidence": ["Physical or documentary items an inspector will physically inspect or verify on board — e.g. the actual SMS procedure with revision stamp, the calibration certificate, the signed crew acknowledgement list"],
+    "retention_period": "How long these records should be retained e.g. 3 years, last 2 inspection cycles"
+  },
+  "inspector_response": "A formal 2-3 paragraph response in professional maritime language, suitable for direct submission to OCIMF/the inspector. Acknowledge the finding, state the immediate corrective action taken, describe systemic/preventive measures implemented, and confirm what objective evidence is available for verification."
 }`;
 
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      // RAISED from 1500 to 2500 to prevent truncation of the inspector_response field
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2500, messages: [{ role: 'user', content: prompt }] })
+      // 3000 tokens to accommodate documentary_evidence + inspector_response without truncation
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
     });
 
     const aiData = await aiRes.json();
