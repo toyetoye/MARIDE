@@ -13651,32 +13651,49 @@ app.post('/api/sire/parse-report', requireAuth, async (req, res) => {
     const mainDb = readDB();
     const vessel = mainDb.vessels.find(v => v.id === vessel_id) || { name: vessel_name || 'Unknown' };
 
-    const prompt = `You are an expert maritime SIRE inspection analyst. You have been given a SIRE inspection report for vessel "${vessel.name}".
+    const prompt = `You are an expert maritime SIRE 2.0 inspection analyst. You have been given a SIRE 2.0 inspection report for vessel "${vessel.name}".
 
-Extract ALL findings, observations, and deficiencies from this report. For each finding extract:
+Extract ALL findings, observations, and deficiencies from this report.
+
+SIRE 2.0 uses the following 12-chapter structure — use ONLY these chapter codes:
+  C1  = Vessel, Operator and Inspection Particulars
+  C2  = Certification and Documentation
+  C3  = Crew Management
+  C4  = Navigation
+  C5  = Safety Management
+  C6  = Pollution Prevention
+  C7  = Maritime Security
+  C8  = Cargo and Ballast Systems
+  C9  = Mooring and Anchoring
+  C10 = Machinery
+  C11 = General Appearance and Condition (Photograph Comparison)
+  C12 = Ice Operations
+
+For each finding extract:
 - The exact description of what was observed
-- Which SIRE chapter it falls under (C1-C7)
-- Severity (obs=observation, minor=minor finding, major=major finding)
-- Inspector name/company if mentioned
+- Which SIRE 2.0 chapter it falls under — use ONLY the codes above (C1–C12). Map by topic: certification/docs=C2, crew/training=C3, navigation/bridge=C4, safety/LSA/fire/drills=C5, pollution/MARPOL=C6, security/ISPS=C7, cargo/ballast/tanks=C8, mooring/anchoring=C9, machinery/engine=C10, condition/photographs=C11, ice=C12
+- Question reference number if visible (e.g. 5.3.2)
+- Severity: "obs" for observation/notable practice, "minor" for minor deficiency, "major" for major deficiency. Infer from labels like "Observable deficiency", "Not as expected" (obs/minor), "Deficiency" (minor/major)
+- Inspector name and company if mentioned separately
 - Inspection date if mentioned
-- Any recommended corrective action mentioned
-- The question number or reference if visible
+- Any corrective action mentioned
 
 If any information is missing or unclear, note it as null — do NOT guess.
 
 Return ONLY valid JSON in this exact format:
 {
   "inspection_date": "YYYY-MM-DD or null",
-  "inspector": "name/company or null",
+  "inspector": "name or null",
+  "inspecting_company": "company name or null",
   "vessel_name": "vessel name from report or null",
   "total_findings": 0,
   "findings": [
     {
-      "chapter": "C1",
+      "chapter": "C5",
       "severity": "obs|minor|major",
       "description": "exact finding description",
       "corrective_action": "recommended action or null",
-      "question_ref": "question reference or null"
+      "question_ref": "e.g. 5.3.2 or null"
     }
   ],
   "missing_info": ["list of fields that could not be extracted"],
@@ -13850,6 +13867,19 @@ app.put('/api/sire/findings/:id/cap', requireAuth, (req, res) => {
     db.findings[idx].cap_updated_at = new Date().toISOString();
     writeSireDB(db);
     res.json(db.findings[idx]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Delete a finding (admin only)
+app.delete('/api/sire/finding/:id', requireAuth, (req, res) => {
+  try {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    const db = readSireDB();
+    const before = (db.findings || []).length;
+    db.findings = (db.findings || []).filter(f => f.id !== req.params.id);
+    if (db.findings.length === before) return res.status(404).json({ error: 'Finding not found' });
+    writeSireDB(db);
+    res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
