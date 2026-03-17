@@ -1915,7 +1915,18 @@ Evaluate this CAP against SIRE 2.0 standards. A good CAP must:
 4. Reference the EXACT procedure title and section from the IMS/SMS provided — do not use placeholder references like [SMS Ref XX]; use the actual document name and section if visible in the provided text
 5. Be realistic and achievable
 
-IMPORTANT: When writing the improved_cap and inspector_response, cite specific procedure names and section numbers from the IMS/SMS documents provided above. If no relevant IMS section was found in the provided text, note which type of procedure should be updated.
+IMPORTANT FORMATTING RULES FOR improved_cap:
+- You MUST use EXACTLY these section headers (all caps, followed by a colon):
+  ROOT CAUSE ANALYSIS:
+  IMMEDIATE ACTION:
+  CORRECTIVE ACTION:
+  PREVENTIVE ACTION:
+  SYSTEMIC ACTION:
+  FLEET ACTION:
+- Do NOT use variants like "ROOT CAUSE IDENTIFIED", "IMMEDIATE ACTIONS (Within X hours)", "SYSTEMIC/PREVENTIVE ACTIONS" etc.
+- Each header must be on its own line, preceded by a newline character.
+- Number action items as: 1. item  2. item  (not "(1)" or "1)")
+- Cite specific IMS procedure names and section numbers from the documents provided above where relevant.
 
 Return JSON only (no markdown fences):
 {
