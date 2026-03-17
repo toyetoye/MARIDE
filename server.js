@@ -1048,7 +1048,7 @@ Return ONLY valid JSON:
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
     });
 
     const aiData = await aiRes.json();
@@ -1855,7 +1855,7 @@ app.post('/api/sire/review-cap', requireAuth, async (req, res) => {
 
         if (relevant.length > 0) {
           // Take most relevant blocks (up to 5000 chars total)
-          let budget = 5000;
+          let budget = 3000;
           const picked = [];
           for (const block of relevant) {
             const chunk = block.substring(0, Math.min(1200, budget));
