@@ -1657,7 +1657,7 @@ Return ONLY valid JSON:
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 4000, messages })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages })
     });
 
     const aiData = await aiRes.json();
@@ -1888,7 +1888,7 @@ app.post('/api/sire/review-cap', requireAuth, async (req, res) => {
           if (sc > bestScore) { bestScore = sc; bestChunk = w; }
         }
         if (bestScore > 0) {
-          imsParts.push(`--- ${m.filename} ---\n${bestChunk.substring(0, 1500)}`);
+          imsParts.push(`--- ${m.filename} ---\n${bestChunk.substring(0, 1000)}`);
         }
       }
 
@@ -1914,6 +1914,8 @@ Evaluate this CAP against SIRE 2.0 standards. A good CAP must:
 3. Include systemic prevention
 4. Reference the EXACT procedure title and section from the IMS/SMS provided — do not use placeholder references like [SMS Ref XX]; use the actual document name and section if visible in the provided text
 5. Be realistic and achievable
+
+IMPORTANT: Keep improved_cap under 1500 words total. Be comprehensive but concise.
 
 IMPORTANT FORMATTING RULES FOR improved_cap:
 - You MUST use EXACTLY these section headers (all caps, followed by a colon):
@@ -1953,7 +1955,7 @@ Return JSON only (no markdown fences):
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
       // 3000 tokens to accommodate documentary_evidence + inspector_response without truncation
-      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 3000, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 8000, messages: [{ role: 'user', content: prompt }] })
     });
 
     const aiData = await aiRes.json();
