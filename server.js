@@ -1776,55 +1776,124 @@ Rate this CAP 1-5 and return JSON only:
 
 // ── CAP Review ────────────────────────────────────────────────────────────
 // FIX: max_tokens raised to 2500 + robust JSON extraction with truncation recovery
+// ── IMS Index Builder ─────────────────────────────────────────────────────────
+// Accepts the nsml_ims_sire_index.txt sidecar and stores it for review-cap lookups
+app.post('/api/sire/store-ims-index', requireAuth, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || text.length < 1000) return res.status(400).json({ error: 'text too short' });
+    const dest = path.join(DATA_DIR, 'uploads', 'manuals', 'nsml_ims_sire_index.txt');
+    fs.mkdirSync(path.join(DATA_DIR, 'uploads', 'manuals'), { recursive: true });
+    fs.writeFileSync(dest, text, 'utf8');
+    res.json({ ok: true, chars: text.length, path: 'uploads/manuals/nsml_ims_sire_index.txt' });
+    console.log(`IMS index stored: ${text.length} chars`);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/sire/ims-status', requireAuth, (req, res) => {
+  try {
+    const p = path.join(DATA_DIR, 'uploads', 'manuals', 'nsml_ims_sire_index.txt');
+    if (fs.existsSync(p)) {
+      const stat = fs.statSync(p);
+      const preview = fs.readFileSync(p, 'utf8').substring(0, 200);
+      res.json({ present: true, size_kb: Math.round(stat.size/1024), preview });
+    } else {
+      res.json({ present: false });
+    }
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/sire/review-cap', requireAuth, async (req, res) => {
   if (!ANTHROPIC_API_KEY) return res.status(500).json({ error: 'API key not configured' });
   try {
     const { finding_id, description, chapter, severity, root_cause, corrective_action, vessel_type, vessel_id } = req.body;
 
-    // ── Pull relevant IMS/SMS procedures from Knowledge Repository ──────────
+    // ── Pull relevant IMS/SMS procedures ──────────────────────────────────────
+    // Priority 1: NSML IMS sidecar files (chapter-indexed sections)
+    // Priority 2: Any other uploaded SMS/procedure documents in repo
     let imsContext = '';
-    try {
-      const repoDb = readRepoDb();
-      const manuals = repoDb.manuals.filter(m => !m.superseded);
 
+    // SIRE chapter → IMS section prefixes
+    const CHAPTER_IMS_SECTIONS = {
+      'C1': ['1.1','1.2','1.3','1.4'],
+      'C2': ['1.6','1.7','1.14','1.16'],
+      'C3': ['1.10','1.11','1.12','1.13'],
+      'C4': ['3.'],
+      'C5': ['2.','7.'],
+      'C6': ['2.13','2.14','4.6'],
+      'C7': ['1.15'],
+      'C8': ['4.'],
+      'C9': ['3.14'],
+      'C10': ['5.'],
+      'C11': ['5.1','6.'],
+      'C12': ['3.15','3.16'],
+    };
+
+    try {
+      const uploadsDir = path.join(DATA_DIR, 'uploads');
+      const imsSidecarPath = path.join(uploadsDir, 'manuals', 'nsml_ims_sire_index.txt');
       const keywords = [
         ...(description || '').toLowerCase().split(/\s+/).filter(w => w.length > 4),
         ...(chapter || '').toLowerCase().split(/[\s-]+/).filter(w => w.length > 1),
-        'sms', 'procedure', 'maintenance', 'inspection', 'safety'
-      ];
+      ].filter(Boolean);
 
-      const scored = manuals.map(m => {
-        let score = 0;
-        const meta = ((m.filename||'') + ' ' + (m.summary||'') + ' ' + (m.category||'') + ' ' + (m.equipment_name||'')).toLowerCase();
-        keywords.forEach(w => { if (meta.includes(w)) score += 2; });
-        if (/ims|sms|safety.management|procedure/i.test(m.filename)) score += 5;
-        if (vessel_id && m.vessel_id && m.vessel_id !== vessel_id) score -= 3;
-        if (m.text_extracted) score += 1;
-        return { m, score };
-      }).filter(s => s.score > 0).sort((a, b) => b.score - a.score);
+      let imsParts = [];
 
-      const top = scored.slice(0, 3);
-      const imsParts = [];
-      for (const { m } of top) {
-        const sidecar = loadSidecarText(m.stored_name, path.join(DATA_DIR, 'uploads'));
-        if (sidecar) {
-          const kw = keywords.join('|');
-          const re = new RegExp(kw, 'i');
-          let bestChunk = sidecar.substring(0, 2000);
-          let bestScore = 0;
-          const WINDOW = 3000, STEP = 500;
-          for (let pos = 0; pos < Math.min(sidecar.length - WINDOW, 80000); pos += STEP) {
-            const window = sidecar.substring(pos, pos + WINDOW);
-            const matchCount = (window.match(re) || []).length;
-            if (matchCount > bestScore) { bestScore = matchCount; bestChunk = window; }
+      // ── 1. Use pre-built NSML IMS SIRE index if available ──────────────────
+      if (fs.existsSync(imsSidecarPath)) {
+        const imsIndex = fs.readFileSync(imsSidecarPath, 'utf8');
+        const chKey = (chapter || '').toUpperCase().trim().substring(0, 2);
+        const sectionPrefixes = CHAPTER_IMS_SECTIONS[chKey] || [];
+
+        // Extract sections matching this SIRE chapter
+        const sectionBlocks = imsIndex.split(/\n#{2,3} IMS /);
+        const relevant = sectionBlocks.filter(block => {
+          const firstLine = block.split('\n')[0];
+          return sectionPrefixes.some(p => firstLine.startsWith(p)) ||
+                 keywords.some(kw => block.toLowerCase().includes(kw));
+        });
+
+        if (relevant.length > 0) {
+          // Take most relevant blocks (up to 5000 chars total)
+          let budget = 5000;
+          const picked = [];
+          for (const block of relevant) {
+            const chunk = block.substring(0, Math.min(1200, budget));
+            picked.push('### IMS ' + chunk);
+            budget -= chunk.length;
+            if (budget <= 0) break;
           }
-          imsParts.push(`--- ${m.filename} (${m.category}) ---\n${bestChunk.substring(0, 2500)}`);
-        } else {
-          imsParts.push(`--- ${m.filename} (${m.category}) [text not extracted — summary: ${m.summary || 'N/A'}] ---`);
+          imsParts.push(`NSML IMS — Chapter ${chKey} Relevant Sections:\n${picked.join('\n')}`);
         }
       }
+
+      // ── 2. Also search repo_db for any other uploaded SMS/procedure docs ──
+      const repoDb = readRepoDb();
+      const manuals = repoDb.manuals.filter(m =>
+        !m.superseded &&
+        m.text_extracted &&
+        /ims|sms|safety.management|procedure|manual/i.test((m.filename||'') + (m.category||''))
+      );
+
+      for (const m of manuals.slice(0, 2)) {
+        const sidecar = loadSidecarText(m.stored_name, uploadsDir);
+        if (!sidecar) continue;
+        const kwRe = new RegExp(keywords.join('|'), 'i');
+        let bestChunk = sidecar.substring(0, 1500);
+        let bestScore = 0;
+        const WINDOW = 2000, STEP = 500;
+        for (let pos = 0; pos < Math.min(sidecar.length - WINDOW, 60000); pos += STEP) {
+          const w = sidecar.substring(pos, pos + WINDOW);
+          const sc = (w.match(kwRe) || []).length;
+          if (sc > bestScore) { bestScore = sc; bestChunk = w; }
+        }
+        if (bestScore > 0) {
+          imsParts.push(`--- ${m.filename} ---\n${bestChunk.substring(0, 1500)}`);
+        }
+      }
+
       if (imsParts.length > 0) {
-        imsContext = `\n\nRELEVANT IMS/SMS PROCEDURES FROM KNOWLEDGE REPOSITORY:\n${imsParts.join('\n\n')}`;
+        imsContext = `\n\nNSML IMS/SMS REFERENCE:\n${imsParts.join('\n\n')}`;
       }
     } catch(imsErr) {
       console.warn('IMS lookup failed (non-fatal):', imsErr.message);
