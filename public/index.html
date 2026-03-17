@@ -9165,31 +9165,45 @@ function buildFindingCard(f, isOverdue, cls, source) {
   </div>`;
 }
 
-// CAP Section Parser v6
-// Handles AI text where labels appear mid-paragraph (no newlines between sections)
-// Labels matched when preceded by: start, newline, ". ", ": ", or after "(Completed)"
+// CAP Section Parser v7
+// Handles all label variants the AI generates, including plural/alternative forms
 function formatCAPSections(text, theme) {
   if (!text) return '';
   const dark = theme === 'dark';
 
-  // All label variants the AI actually generates — longer before shorter
   const LABELS = [
-    { key: 'ROOT CAUSE IDENTIFIED',       icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
-    { key: 'ROOT CAUSE ANALYSIS',         icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
-    { key: 'IMMEDIATE CORRECTIVE ACTION', icon: '⚡', color: dark?'#f59e0b':'#d97706', bc:'#f59e0b' },
-    { key: 'IMMEDIATE ACTION',            icon: '⚡', color: dark?'#f59e0b':'#d97706', bc:'#f59e0b' },
-    { key: 'SYSTEMIC CORRECTIVE ACTIONS', icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
-    { key: 'SYSTEMIC CORRECTIVE ACTION',  icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
-    { key: 'CORRECTIVE ACTION',           icon: '🔧', color: dark?'#60a5fa':'#2563eb', bc:'#60a5fa' },
-    { key: 'PREVENTATIVE ACTION',         icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
-    { key: 'PREVENTIVE ACTION',           icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
-    { key: 'SYSTEMIC / PREVENTIVE ACTION',icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
-    { key: 'SYSTEMIC ACTION',             icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
-    { key: 'ROOT CAUSE',                  icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
-    { key: 'FLEET ACTION',                icon: '🚢', color: dark?'#fb923c':'#ea580c', bc:'#fb923c' },
-    { key: 'EVIDENCE OF COMPLETION',      icon: '📁', color: dark?'#a78bfa':'#7c3aed', bc:'#a78bfa' },
-    { key: 'SHORT-TERM',                  icon: '📅', color: dark?'#60a5fa':'#2563eb', bc:'#60a5fa' },
-    { key: 'LONG-TERM',                   icon: '🔁', color: dark?'#a78bfa':'#7c3aed', bc:'#a78bfa' },
+    // ROOT CAUSE variants — longest first
+    { key: 'ROOT CAUSE ANALYSIS',              icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
+    { key: 'ROOT CAUSE IDENTIFIED',            icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
+    { key: 'ROOT CAUSE ADDRESSED',             icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
+    { key: 'ROOT CAUSE',                       icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
+    // IMMEDIATE variants
+    { key: 'IMMEDIATE CORRECTIVE ACTIONS',     icon: '⚡', color: dark?'#f59e0b':'#d97706', bc:'#f59e0b' },
+    { key: 'IMMEDIATE CORRECTIVE ACTION',      icon: '⚡', color: dark?'#f59e0b':'#d97706', bc:'#f59e0b' },
+    { key: 'IMMEDIATE ACTIONS',                icon: '⚡', color: dark?'#f59e0b':'#d97706', bc:'#f59e0b' },
+    { key: 'IMMEDIATE ACTION',                 icon: '⚡', color: dark?'#f59e0b':'#d97706', bc:'#f59e0b' },
+    // SYSTEMIC / PREVENTIVE variants
+    { key: 'SYSTEMIC CORRECTIVE ACTIONS',      icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
+    { key: 'SYSTEMIC CORRECTIVE ACTION',       icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
+    { key: 'SYSTEMIC/PREVENTIVE ACTIONS',      icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'SYSTEMIC/PREVENTIVE ACTION',       icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'SYSTEMIC / PREVENTIVE ACTIONS',    icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'SYSTEMIC / PREVENTIVE ACTION',     icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'SYSTEMIC ACTIONS',                 icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
+    { key: 'SYSTEMIC ACTION',                  icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
+    // CORRECTIVE
+    { key: 'CORRECTIVE ACTIONS',               icon: '🔧', color: dark?'#60a5fa':'#2563eb', bc:'#60a5fa' },
+    { key: 'CORRECTIVE ACTION',                icon: '🔧', color: dark?'#60a5fa':'#2563eb', bc:'#60a5fa' },
+    // PREVENTIVE / PREVENTATIVE
+    { key: 'PREVENTATIVE ACTIONS',             icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'PREVENTATIVE ACTION',              icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'PREVENTIVE ACTIONS',               icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'PREVENTIVE ACTION',                icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    // Others
+    { key: 'FLEET ACTION',                     icon: '🚢', color: dark?'#fb923c':'#ea580c', bc:'#fb923c' },
+    { key: 'EVIDENCE OF COMPLETION',           icon: '📁', color: dark?'#a78bfa':'#7c3aed', bc:'#a78bfa' },
+    { key: 'SHORT-TERM',                       icon: '📅', color: dark?'#60a5fa':'#2563eb', bc:'#60a5fa' },
+    { key: 'LONG-TERM',                        icon: '🔁', color: dark?'#a78bfa':'#7c3aed', bc:'#a78bfa' },
   ];
 
   const txtUp = text.toUpperCase();
@@ -9201,19 +9215,20 @@ function formatCAPSections(text, theme) {
       const pos = txtUp.indexOf(lbl.key, s);
       if (pos === -1) break;
 
-      // What comes BEFORE the label
+      // What precedes the label — allow: start, newline, ". ", ": ", ") "
       const prev2 = pos >= 2 ? txtUp.substring(pos - 2, pos) : '  ';
       const prev1 = pos >= 1 ? txtUp[pos - 1] : ' ';
-      // Allow: start of text, after newline, after ". ", after ": ", after ") "
       const prevOk = pos === 0 ||
         '\n\r'.indexOf(prev1) !== -1 ||
         prev2 === '. ' || prev2 === ': ' || prev2 === ') ' ||
         (prev1 === ' ' && pos >= 2 && '.:\n\r)'.indexOf(txtUp[pos-2]) !== -1);
 
-      // What comes AFTER the label — allow colon, "(", space+colon, end of text
+      // What follows the label — allow: colon, "(", space+colon, space+"(", end of text
+      // Also allow a space followed by a word (for "ROOT CAUSE ADDRESSED:" where
+      // we already captured "ADDRESSED" as part of the key above)
       const afterIdx = pos + lbl.key.length;
       const rest = afterIdx < txtUp.length ? txtUp.substring(afterIdx, afterIdx + 5).trimStart() : ':';
-      const afterOk = ':('.indexOf(rest.charAt(0)) !== -1 || afterIdx >= txtUp.length;
+      const afterOk = ':(/'.indexOf(rest.charAt(0)) !== -1 || afterIdx >= txtUp.length;
 
       if (prevOk && afterOk) {
         rawPositions.push({ pos: pos, label: lbl, len: lbl.key.length });
@@ -9224,7 +9239,7 @@ function formatCAPSections(text, theme) {
 
   rawPositions.sort(function(a, b) { return a.pos - b.pos; });
 
-  // Deduplicate — if a match starts within span of a prior match, skip it
+  // Deduplicate — longest label wins at any given position
   let positions = [];
   rawPositions.forEach(function(p) {
     const covered = positions.some(function(a) {
@@ -9240,7 +9255,6 @@ function formatCAPSections(text, theme) {
     return '<div style="background:'+bg+';border:1px solid '+bd+';border-radius:5px;padding:12px 14px;font-size:11px;color:'+col+';line-height:1.7;">'+text+'</div>';
   }
 
-  // Build segments
   let segs = [];
   if (positions[0].pos > 0) {
     segs.push({ label: null, text: text.substring(0, positions[0].pos).trim() });
@@ -9248,10 +9262,9 @@ function formatCAPSections(text, theme) {
   for (let i = 0; i < positions.length; i++) {
     const bodyStart = positions[i].pos + positions[i].label.key.length;
     const end = i + 1 < positions.length ? positions[i + 1].pos : text.length;
-    // Strip leading colon, parenthetical like "(Completed):", spaces
     const body = text.substring(bodyStart, end)
-      .replace(/^\s*\([^)]*\)\s*:?\s*/, '')  // strip "(Completed):" etc
-      .replace(/^[\s:]+/, '')
+      .replace(/^\s*\([^)]*\)\s*:?\s*/, '')   // strip "(Within 24 hours):" etc
+      .replace(/^[\s:/]+/, '')
       .trim();
     segs.push({ label: positions[i].label, text: body });
   }
@@ -9273,7 +9286,7 @@ function formatCAPSections(text, theme) {
     const bg  = dark?'rgba('+h2r(lbl.bc)+',0.08)':'rgba('+h2r(lbl.bc)+',0.05)';
     const tc  = dark?'var(--text)':'#1e293b';
 
-    // Detect numbered list — "(1) ... (2) ..." or "1. ... 2. ..."
+    // Detect numbered list
     let bh = '';
     const isNumbered = /\(?\d+[\).]/.test(seg.text);
     if (isNumbered) {
