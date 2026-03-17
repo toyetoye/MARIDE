@@ -9165,24 +9165,25 @@ function buildFindingCard(f, isOverdue, cls, source) {
   </div>`;
 }
 
-// CAP Section Parser v5
-// Splits AI improved_cap text into headed sections.
-// KEY RULES:
-//   (a) Longer labels before shorter (ROOT CAUSE ANALYSIS before ROOT CAUSE)
-//   (b) Overlapping matches deduplicated - longest label wins
-//   (c) Labels only match when at line-start AND followed by colon
+// CAP Section Parser v6
+// Handles AI text where labels appear mid-paragraph (no newlines between sections)
+// Labels matched when preceded by: start, newline, ". ", ": ", or after "(Completed)"
 function formatCAPSections(text, theme) {
   if (!text) return '';
   const dark = theme === 'dark';
 
-  // IMPORTANT: longer labels must appear BEFORE shorter ones they contain.
+  // All label variants the AI actually generates — longer before shorter
   const LABELS = [
+    { key: 'ROOT CAUSE IDENTIFIED',       icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
     { key: 'ROOT CAUSE ANALYSIS',         icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
+    { key: 'IMMEDIATE CORRECTIVE ACTION', icon: '⚡', color: dark?'#f59e0b':'#d97706', bc:'#f59e0b' },
     { key: 'IMMEDIATE ACTION',            icon: '⚡', color: dark?'#f59e0b':'#d97706', bc:'#f59e0b' },
     { key: 'SYSTEMIC CORRECTIVE ACTIONS', icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
+    { key: 'SYSTEMIC CORRECTIVE ACTION',  icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
     { key: 'CORRECTIVE ACTION',           icon: '🔧', color: dark?'#60a5fa':'#2563eb', bc:'#60a5fa' },
     { key: 'PREVENTATIVE ACTION',         icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
     { key: 'PREVENTIVE ACTION',           icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
+    { key: 'SYSTEMIC / PREVENTIVE ACTION',icon: '🛡',  color: dark?'#34d399':'#16a34a', bc:'#34d399' },
     { key: 'SYSTEMIC ACTION',             icon: '🔄', color: dark?'#c084fc':'#9333ea', bc:'#c084fc' },
     { key: 'ROOT CAUSE',                  icon: '🔍', color: dark?'#f87171':'#dc2626', bc:'#f87171' },
     { key: 'FLEET ACTION',                icon: '🚢', color: dark?'#fb923c':'#ea580c', bc:'#fb923c' },
@@ -9193,20 +9194,27 @@ function formatCAPSections(text, theme) {
 
   const txtUp = text.toUpperCase();
 
-  // Collect all candidate positions
   let rawPositions = [];
   LABELS.forEach(function(lbl) {
     let s = 0;
     while (true) {
       const pos = txtUp.indexOf(lbl.key, s);
       if (pos === -1) break;
-      // Must be at start of text or immediately after a newline
-      const prev = pos > 0 ? txtUp[pos - 1] : '\n';
-      const prevOk = pos === 0 || '\n\r'.indexOf(prev) !== -1;
-      // Must be followed (after optional spaces) by a colon
+
+      // What comes BEFORE the label
+      const prev2 = pos >= 2 ? txtUp.substring(pos - 2, pos) : '  ';
+      const prev1 = pos >= 1 ? txtUp[pos - 1] : ' ';
+      // Allow: start of text, after newline, after ". ", after ": ", after ") "
+      const prevOk = pos === 0 ||
+        '\n\r'.indexOf(prev1) !== -1 ||
+        prev2 === '. ' || prev2 === ': ' || prev2 === ') ' ||
+        (prev1 === ' ' && pos >= 2 && '.:\n\r)'.indexOf(txtUp[pos-2]) !== -1);
+
+      // What comes AFTER the label — allow colon, "(", space+colon, end of text
       const afterIdx = pos + lbl.key.length;
-      const rest = afterIdx < txtUp.length ? txtUp.substring(afterIdx, afterIdx + 4).trimStart() : ':';
-      const afterOk = rest.charAt(0) === ':' || afterIdx >= txtUp.length;
+      const rest = afterIdx < txtUp.length ? txtUp.substring(afterIdx, afterIdx + 5).trimStart() : ':';
+      const afterOk = ':('.indexOf(rest.charAt(0)) !== -1 || afterIdx >= txtUp.length;
+
       if (prevOk && afterOk) {
         rawPositions.push({ pos: pos, label: lbl, len: lbl.key.length });
       }
@@ -9214,11 +9222,9 @@ function formatCAPSections(text, theme) {
     }
   });
 
-  // Sort by position
   rawPositions.sort(function(a, b) { return a.pos - b.pos; });
 
-  // Deduplicate: if a match starts within the span of a previous match, skip it
-  // (since LABELS is ordered longest-first, the first at any position wins)
+  // Deduplicate — if a match starts within span of a prior match, skip it
   let positions = [];
   rawPositions.forEach(function(p) {
     const covered = positions.some(function(a) {
@@ -9227,7 +9233,6 @@ function formatCAPSections(text, theme) {
     if (!covered) positions.push(p);
   });
 
-  // No labels found — plain block
   if (!positions.length) {
     const bg  = dark?'rgba(61,184,122,0.07)':'#f8fafc';
     const bd  = dark?'rgba(61,184,122,0.25)':'#e2e8f0';
@@ -9241,10 +9246,13 @@ function formatCAPSections(text, theme) {
     segs.push({ label: null, text: text.substring(0, positions[0].pos).trim() });
   }
   for (let i = 0; i < positions.length; i++) {
-    // Strip label key + following colon + spaces from body start
     const bodyStart = positions[i].pos + positions[i].label.key.length;
     const end = i + 1 < positions.length ? positions[i + 1].pos : text.length;
-    const body = text.substring(bodyStart, end).replace(/^[\s:]+/, '').trim();
+    // Strip leading colon, parenthetical like "(Completed):", spaces
+    const body = text.substring(bodyStart, end)
+      .replace(/^\s*\([^)]*\)\s*:?\s*/, '')  // strip "(Completed):" etc
+      .replace(/^[\s:]+/, '')
+      .trim();
     segs.push({ label: positions[i].label, text: body });
   }
 
@@ -9258,30 +9266,21 @@ function formatCAPSections(text, theme) {
   let html = '';
   segs.forEach(function(seg) {
     if (!seg.label) {
-      if (seg.text) {
-        html += '<div style="font-size:11px;color:'+(dark?'var(--text-dim)':'#64748b')+';line-height:1.7;margin-bottom:8px;">'+seg.text+'</div>';
-      }
+      if (seg.text) html += '<div style="font-size:11px;color:'+(dark?'var(--text-dim)':'#64748b')+';line-height:1.7;margin-bottom:8px;">'+seg.text+'</div>';
       return;
     }
     const lbl = seg.label;
     const bg  = dark?'rgba('+h2r(lbl.bc)+',0.08)':'rgba('+h2r(lbl.bc)+',0.05)';
     const tc  = dark?'var(--text)':'#1e293b';
 
-    // Detect numbered list — handles "1." "1)" "(1)" "(1." styles
-    // Split on lines starting with optional "(" then digit then "." or ")"
+    // Detect numbered list — "(1) ... (2) ..." or "1. ... 2. ..."
     let bh = '';
-    const lines = seg.text.split('\n');
-    const isNumbered = lines.some(function(l) { return /^\s*\(?\d+[\).]/.test(l); });
+    const isNumbered = /\(?\d+[\).]/.test(seg.text);
     if (isNumbered) {
-      // Reassemble and split on numbered boundaries
-      const parts = seg.text.split(/(?=\n\s*\(?\d+[\).])/).concat();
+      const parts = seg.text.split(/(?=\s*\(?\d+[\).]\s)/);
       const items = [];
-      // Also handle inline numbered items (no newlines between them)
-      const inlineParts = seg.text.split(/(?=\(?\d+[\).]\s)/).filter(function(p){return p.trim().length > 0;});
-      const workParts = parts.length > 1 ? parts : inlineParts;
-      workParts.forEach(function(p) {
-        // Strip leading newlines, optional "(", digits, "." or ")", spaces
-        const clean = p.replace(/^[\n\s]*\(?\d+[\).]+\s*/, '').trim();
+      parts.forEach(function(p) {
+        const clean = p.replace(/^\s*\(?\d+[\).]+\s*/, '').trim();
         if (clean.length > 2) items.push(clean);
       });
       if (items.length > 0) {
@@ -9297,11 +9296,11 @@ function formatCAPSections(text, theme) {
 
     html += '<div style="margin-bottom:10px;padding:10px 12px 10px 14px;background:'+bg+';border-left:3px solid '+lbl.bc+';border-radius:0 4px 4px 0;">'
       + '<div style="font-size:9px;font-weight:700;color:'+lbl.color+';letter-spacing:1.2px;text-transform:uppercase;margin-bottom:6px;">'+lbl.icon+' '+lbl.key+'</div>'
-      + bh
-      + '</div>';
+      + bh + '</div>';
   });
   return html;
 }
+
 
 function hexToRgb(hex) {
   hex=hex.replace('#','');
