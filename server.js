@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
+const rag    = require('./rag');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -79,6 +80,8 @@ function seedAdmin() {
 }
 
 seedAdmin();
+// Boot pgvector schema on Railway (non-blocking)
+rag.initSchema().catch(err => console.error('[RAG] Init failed:', err.message));
 
 // ── Middleware ─────────────────────────────────────────────────────────────
 app.use(cors({
@@ -2279,6 +2282,15 @@ app.post('/api/repo/upload', requireAuth, uploadManual.single('file'), async (re
     db.manuals.push(manual);
     writeRepoDb(db);
     res.json(manual);
+
+    // Index in pgvector asynchronously (non-blocking)
+    if (extractedText) {
+      setImmediate(() => {
+        rag.indexManual(manual, extractedText)
+          .then(r => console.log(`[RAG] ${manual.filename}: ${r.ok ? r.chunks + ' chunks indexed' : 'skipped — ' + r.reason}`))
+          .catch(e => console.error('[RAG] Index error:', e.message));
+      });
+    }
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2322,6 +2334,10 @@ app.post('/api/repo/manuals/:id/reextract', requireAuth, async (req, res) => {
           };
           writeRepoDb(db2);
           console.log('Re-extract complete:', manual.filename, '—', extracted.method, extracted.text.length, 'chars');
+          // Re-index in pgvector
+          rag.indexManual(db2.manuals[idx], extracted.text)
+            .then(r => console.log(`[RAG] Re-index ${manual.filename}: ${r.ok ? r.chunks + ' chunks' : r.reason}`))
+            .catch(e => console.error('[RAG] Re-index error:', e.message));
         }
       } catch(e) { console.error('Background re-extract error:', e.message); }
     })();
@@ -2372,6 +2388,8 @@ app.delete('/api/repo/manuals/:id', requireAuth, (req, res) => {
     const db = readRepoDb();
     const manual = db.manuals.find(m => m.id === req.params.id);
     if (!manual) return res.status(404).json({ error: 'Not found' });
+    // Remove pgvector embeddings
+    rag.deleteManual(manual.id).catch(e => console.error('[RAG] Delete error:', e.message));
     try {
       const fp = path.join(DATA_DIR, 'uploads', 'manuals', manual.stored_name);
       if (fs.existsSync(fp)) fs.unlinkSync(fp);
@@ -2466,6 +2484,71 @@ app.post('/api/repo/search', requireAuth, async (req, res) => {
     if (category && category !== 'all')  manuals = manuals.filter(m => m.category === category);
     if (!manuals.length) return res.json({ answer: 'No manuals found for this vessel/category.', sources: [] });
 
+    // ── Try pgvector semantic search first ──────────────────────────────────
+    const ragChunks = await rag.search(question, { vessel_id, category }).catch(() => null);
+
+    if (ragChunks && ragChunks.length > 0) {
+      // ── RAG path: use vector-retrieved chunks ───────────────────────────
+      console.log(`[RAG] Vector search: ${ragChunks.length} chunks retrieved for: "${question.substring(0,60)}"`);
+
+      const context = rag.buildContext(ragChunks);
+
+      // Deduplicate source manuals for the sources list
+      const sourceMap = {};
+      ragChunks.forEach(c => { if (!sourceMap[c.manual_id]) sourceMap[c.manual_id] = c; });
+      const sources = Object.values(sourceMap).map(c => ({ id: c.manual_id, filename: c.filename }));
+
+      const systemPrompt = `You are ORACLE, a senior marine engineering expert and technical knowledge assistant for NSML fleet vessels. You answer questions based on the retrieved manual extracts provided. Each extract is labelled [REF N] with its source. Cite references where relevant. If the manuals do not cover the question, say so clearly.`;
+
+      let messages;
+      if (is_follow_up && history && history.length >= 2) {
+        messages = [
+          { role: 'user', content: `MANUAL EXTRACTS:
+
+${context}
+
+First question: "${history[0]?.content || question}"` },
+          ...history.slice(1).map(h => ({ role: h.role, content: h.content })),
+          { role: 'user', content: `Follow-up: ${question}
+
+Answer concisely based on the extracts and our conversation.` }
+        ];
+      } else {
+        messages = [{
+          role: 'user',
+          content: `MANUAL EXTRACTS:
+
+${context}
+
+---
+
+Question: "${question}"
+
+Respond in two sections:
+
+**MANUAL SAYS:**
+Answer directly from the extracts above. Quote values, steps, or limits exactly. Cite [REF N] where applicable. If not covered write: "Not covered in retrieved manual sections."
+
+**TECHNICAL INSIGHT:**
+As a senior marine engineer, expand on the answer — explain the engineering reason, what to check first in practice, and common failure causes. 2–5 sentences.`
+        }];
+      }
+
+      const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2000, system: systemPrompt, messages })
+      });
+      const aiData = await aiRes.json();
+      if (aiData.error) return res.json({ answer: 'AI error: ' + aiData.error.message, sources: [] });
+
+      const answer = (aiData.content||[]).find(c => c.type === 'text')?.text || 'No answer returned';
+      return res.json({ answer, sources, rag: true, chunks_used: ragChunks.length });
+    }
+
+    // ── Fallback: original keyword + full-text path ─────────────────────────
+    console.log(`[RAG] Fallback to keyword search for: "${question.substring(0,60)}"`);
+
     const qWords = question.toLowerCase().split(/\s+/).filter(w => w.length > 3);
     const scored = manuals.map(m => {
       let score = 0;
@@ -2529,17 +2612,7 @@ app.post('/api/repo/search', requireAuth, async (req, res) => {
       });
     }
 
-    contentParts.push({ type: 'text', text: `You are a senior marine engineer answering a question from an officer or engineer onboard.
-
-Question: "${question}"
-
-Respond in exactly two sections:
-
-**MANUAL SAYS:**
-Search the manual content above and extract the relevant answer. Be specific — reproduce exact steps, values, or fault tables if present. If not covered, write: "Not covered in this manual." Cite the section or page reference if visible.
-
-**TECHNICAL INSIGHT:**
-Give your own expert explanation as a senior marine engineer. Expand on the manual answer — explain the underlying reason why, what to check first in practice, common causes or mistakes. 2-5 sentences.` });
+    contentParts.push({ type: 'text', text: `You are a senior marine engineer answering a question from an officer or engineer onboard.\n\nQuestion: "${question}"\n\nRespond in exactly two sections:\n\n**MANUAL SAYS:**\nSearch the manual content above and extract the relevant answer. Be specific — reproduce exact steps, values, or fault tables if present. If not covered, write: "Not covered in this manual." Cite the section or page reference if visible.\n\n**TECHNICAL INSIGHT:**\nGive your own expert explanation as a senior marine engineer. Expand on the manual answer — explain the underlying reason why, what to check first in practice, common causes or mistakes. 2-5 sentences.` });
 
     let messages;
     if (is_follow_up && history && history.length >= 2) {
@@ -2568,9 +2641,60 @@ Give your own expert explanation as a senior marine engineer. Expand on the manu
 
     const answer = (aiData.content||[]).find(c => c.type === 'text')?.text || 'No answer returned';
     const sources = toScan.filter((m,i) => contentParts[i]).map(m => ({ id: m.id, filename: m.filename }));
-    res.json({ answer, sources });
+    res.json({ answer, sources, rag: false });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+
+// ── RAG stats endpoint (admin) ────────────────────────────────────────────
+app.get('/api/rag/stats', requireAuth, async (req, res) => {
+  try {
+    const stats = await rag.getStats();
+    res.json(stats);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Manually trigger indexing for an existing manual ─────────────────────
+app.post('/api/rag/index/:id', requireAuth, async (req, res) => {
+  try {
+    const db     = readRepoDb();
+    const manual = db.manuals.find(m => m.id === req.params.id);
+    if (!manual) return res.status(404).json({ error: 'Manual not found' });
+
+    const sidecar = loadSidecarText(manual.stored_name, path.join(DATA_DIR, 'uploads'));
+    if (!sidecar) return res.status(400).json({ error: 'No extracted text — run ⚙ Extract first' });
+
+    res.json({ message: 'Indexing started', filename: manual.filename });
+
+    setImmediate(() => {
+      rag.indexManual(manual, sidecar)
+        .then(r => console.log(`[RAG] Manual index trigger: ${manual.filename} — ${r.ok ? r.chunks + ' chunks' : r.reason}`))
+        .catch(e => console.error('[RAG] Manual index error:', e.message));
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Bulk index all extracted manuals (admin only) ─────────────────────────
+app.post('/api/rag/index-all', requireAuth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  try {
+    const db = readRepoDb();
+    const toIndex = db.manuals.filter(m => m.text_extracted && !m.superseded);
+    res.json({ message: `Bulk indexing started for ${toIndex.length} manuals`, count: toIndex.length });
+
+    (async () => {
+      let ok = 0, fail = 0;
+      for (const manual of toIndex) {
+        const sidecar = loadSidecarText(manual.stored_name, path.join(DATA_DIR, 'uploads'));
+        if (!sidecar) { fail++; continue; }
+        const r = await rag.indexManual(manual, sidecar).catch(() => ({ ok: false }));
+        r.ok ? ok++ : fail++;
+        await new Promise(resolve => setTimeout(resolve, 500)); // rate limit
+      }
+      console.log(`[RAG] Bulk index complete: ${ok} ok, ${fail} failed`);
+    })();
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 
 app.post('/api/repo/suggest-for-defect', requireAuth, async (req, res) => {
   try {
@@ -2906,3 +3030,5 @@ app.get('/api/pms/stats', requireAuth, (req, res) => {
     res.json(JSON.parse(fs.readFileSync(PMS_STATS_PATH, 'utf8')));
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+
+✅ All patches applied successfully
