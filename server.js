@@ -5,6 +5,9 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const rag    = require('./rag');
+const maDB   = require('./db');
+const { readDB, writeDB, readCustDB, writeCustDB, readSireDB, writeSireDB,
+        readRepoDb, writeRepoDb, readPmsDb, savePmsDb } = maDB;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,17 +51,7 @@ console.log('Storage path:', DATA_DIR);
   }
 });
 
-function readDB() {
-  try {
-    if (fs.existsSync(DB_PATH)) return JSON.parse(fs.readFileSync(DB_PATH,'utf8'));
-  } catch(e) { console.error('DB read error:', e.message); }
-  return { users: [], vessels: [], investigations: [], sessions: [] };
-}
-
-function writeDB(data) {
-  try { fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2)); }
-  catch(e) { console.error('DB write error:', e.message); }
-}
+// [readDB/writeDB moved to db.js — block 1]
 
 function seedAdmin() {
   const db = readDB();
@@ -82,6 +75,8 @@ function seedAdmin() {
 seedAdmin();
 // Boot pgvector schema on Railway (non-blocking)
 rag.initSchema().catch(err => console.error('[RAG] Init failed:', err.message));
+// Boot MARIDE PostgreSQL state (blocking — must complete before first request)
+maDB.initMaRideDB().catch(err => { console.error('[MARIDE DB] Fatal init error:', err.message); process.exit(1); });
 
 // ── Middleware ─────────────────────────────────────────────────────────────
 app.use(cors({
@@ -141,9 +136,9 @@ function isCEorMaster(user) {
 }
 
 // ── Health ─────────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  const db = readDB();
-  res.json({ status: 'ok', users: db.users.length, vessels: db.vessels.length, investigations: db.investigations.length });
+app.get('/health', async (req, res) => {
+  const health = await maDB.dbHealth();
+  res.json(health);
 });
 
 // ══════════════════════════════════════════════════════
@@ -675,17 +670,7 @@ Respond ONLY with valid JSON:
 // CUSTODIAN MODULE
 // ══════════════════════════════════════════════════════
 
-function readCustDB() {
-  const custPath = path.join(DATA_DIR, 'custodian.json');
-  try {
-    if (fs.existsSync(custPath)) return JSON.parse(fs.readFileSync(custPath,'utf8'));
-  } catch(e) {}
-  return { equipment:[], defects:[], tempRepairs:[], pmLogs:[], alarmLogs:[], handovers:[] };
-}
-function writeCustDB(data) {
-  const custPath = path.join(DATA_DIR, 'custodian.json');
-  try { fs.writeFileSync(custPath, JSON.stringify(data,null,2)); } catch(e) { console.error(e); }
-}
+// [readCustDB/writeCustDB moved to db.js]
 
 const DEFAULT_EQUIPMENT = [
   { category:'Cargo Equipment',          items:['Cargo Compressor #1','Cargo Compressor #2','Deep Well Pump #1','Deep Well Pump #2','Deep Well Pump #3','Deep Well Pump #4','IGG System','BWTS','Cargo Heater','Vaporiser'] },
@@ -1261,15 +1246,7 @@ app.get('/api/custodian/rounds/status/:vessel_id', requireAuth, (req, res) => {
 // SIRE 2.0 MODULE
 // ══════════════════════════════════════════════════════
 
-function readSireDB() {
-  const sirePath = path.join(DATA_DIR, 'sire.json');
-  try { if (fs.existsSync(sirePath)) return JSON.parse(fs.readFileSync(sirePath,'utf8')); } catch(e) {}
-  return { preparations:{}, findings:[], drillSessions:[], fleetFindings:[] };
-}
-function writeSireDB(data) {
-  const sirePath = path.join(DATA_DIR, 'sire.json');
-  try { fs.writeFileSync(sirePath, JSON.stringify(data,null,2)); } catch(e) { console.error(e); }
-}
+// [readDB/writeDB moved to db.js — block 2]
 
 // ── SIRE_CHAPTERS constant (full 402-question bank) ────────────────────────
 // NOTE: This is the full question bank loaded from the OCIMF SIRE 2.0 Question
@@ -2079,16 +2056,7 @@ const uploadManual = multer({
   }
 });
 
-function readRepoDb() {
-  try {
-    const p = path.join(DATA_DIR, 'repo_db.json');
-    if (!fs.existsSync(p)) return { manuals: [] };
-    return JSON.parse(fs.readFileSync(p, 'utf8'));
-  } catch(e) { return { manuals: [] }; }
-}
-function writeRepoDb(db) {
-  fs.writeFileSync(path.join(DATA_DIR, 'repo_db.json'), JSON.stringify(db, null, 2));
-}
+// [readDB/writeDB moved to db.js — block 3]
 
 function pdfHasTextLayer(buffer) {
   const str = buffer.toString('latin1');
@@ -2729,15 +2697,7 @@ const PMS_STATS_PATH = fs.existsSync(path.join(DATA_DIR,'pms_stats.json'))
   ? path.join(DATA_DIR,'pms_stats.json')
   : path.join(__dirname,'pms_stats.json');
 
-function readPmsDb() {
-  const p = path.join(DATA_DIR, 'pms.json');
-  try { if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8')); } catch(e) {}
-  return { worksheets: [], running_hours: [], defects: [], assignments: [] };
-}
-function savePmsDb(data) {
-  const p = path.join(DATA_DIR, 'pms.json');
-  try { fs.writeFileSync(p, JSON.stringify(data, null, 2)); } catch(e) { console.error(e); }
-}
+// [readDB/writeDB moved to db.js — block 4]
 
 app.get('/api/pms/overview', requireAuth, (req, res) => {
   try {
@@ -3032,3 +2992,4 @@ app.get('/api/pms/stats', requireAuth, (req, res) => {
 });
 
 ✅ All patches applied successfully
+✅ MARIDE server.js patched (4/5 function blocks replaced)
