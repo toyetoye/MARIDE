@@ -2991,5 +2991,3 @@ app.get('/api/pms/stats', requireAuth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-✅ All patches applied successfully
-✅ MARIDE server.js patched (4/5 function blocks replaced)
