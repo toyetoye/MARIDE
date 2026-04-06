@@ -5,6 +5,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const rag    = require('./rag');
+const r2     = require('./r2');
 const maDB   = require('./db');
 const { readDB, writeDB, readCustDB, writeCustDB, readSireDB, writeSireDB,
         readRepoDb, writeRepoDb, readPmsDb, savePmsDb } = maDB;
@@ -2036,19 +2037,9 @@ app.delete('/api/sire/finding/:id', requireAuth, (req, res) => {
 // KNOWLEDGE REPOSITORY
 // ══════════════════════════════════════════════════════
 
-const repoStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(DATA_DIR, 'uploads', 'manuals');
-    fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${Date.now()}_${safe}`);
-  }
-});
+// Memory storage — files are uploaded to R2 immediately, not written to disk
 const uploadManual = multer({
-  storage: repoStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf') cb(null, true);
@@ -2064,8 +2055,10 @@ function pdfHasTextLayer(buffer) {
   return textMatches > 5;
 }
 
-async function extractPdfText(filePath) {
-  const buffer = fs.readFileSync(filePath);
+async function extractPdfText(filePathOrBuffer) {
+  const buffer = Buffer.isBuffer(filePathOrBuffer)
+    ? filePathOrBuffer
+    : fs.readFileSync(filePathOrBuffer);
 
   try {
     const pdfParse = require('pdf-parse');
@@ -2140,9 +2133,16 @@ async function extractPdfText(filePath) {
   }
 }
 
-function saveSidecarText(storedName, text, uploadsDir) {
+async function saveSidecarText(storedName, text, uploadsDir) {
   const txtPath = path.join(uploadsDir, 'manuals', storedName + '.txt');
-  fs.writeFileSync(txtPath, text, 'utf8');
+  try {
+    fs.mkdirSync(path.dirname(txtPath), { recursive: true });
+    fs.writeFileSync(txtPath, text, 'utf8');
+  } catch(e) { console.error('[Sidecar] Local write failed:', e.message); }
+  if (r2.isEnabled()) {
+    await r2.uploadSidecar(storedName, text)
+      .catch(e => console.error('[R2] Sidecar upload failed:', e.message));
+  }
   return txtPath;
 }
 
@@ -2150,6 +2150,20 @@ function loadSidecarText(storedName, uploadsDir) {
   const txtPath = path.join(uploadsDir, 'manuals', storedName + '.txt');
   if (fs.existsSync(txtPath)) return fs.readFileSync(txtPath, 'utf8');
   return null;
+}
+
+// Async version: tries local disk first, then R2
+async function loadSidecarTextAsync(storedName, uploadsDir) {
+  const local = loadSidecarText(storedName, uploadsDir);
+  if (local) return local;
+  if (!r2.isEnabled()) return null;
+  try {
+    const text = await r2.downloadSidecar(storedName);
+    // Cache locally so subsequent calls are fast
+    const txtPath = path.join(uploadsDir, 'manuals', storedName + '.txt');
+    try { fs.mkdirSync(path.dirname(txtPath), { recursive: true }); fs.writeFileSync(txtPath, text, 'utf8'); } catch(e) {}
+    return text;
+  } catch(e) { return null; }
 }
 
 async function categoriseManual(apiKey, { base64, ocrText, filename }) {
@@ -2198,17 +2212,36 @@ app.post('/api/repo/upload', requireAuth, uploadManual.single('file'), async (re
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-    const fileData = fs.readFileSync(req.file.path);
-    const base64   = fileData.toString('base64');
+    // multer memoryStorage gives us req.file.buffer directly
+    const fileBuffer = req.file.buffer;
+    const base64     = fileBuffer.toString('base64');
+
+    // Generate a stored filename (same pattern as old diskStorage)
+    const safe = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storedName = `${Date.now()}_${safe}`;
+
+    // Upload PDF to R2 (non-blocking path if R2 disabled — won't persist, but won't crash)
+    let r2Key = null;
+    if (r2.isEnabled()) {
+      try {
+        r2Key = await r2.uploadPdf(storedName, fileBuffer);
+        console.log('[R2] PDF uploaded:', r2Key);
+      } catch(e) { console.error('[R2] PDF upload failed:', e.message); }
+    } else {
+      // Fallback: write to disk (Railway ephemeral storage — only for dev)
+      const dir = path.join(DATA_DIR, 'uploads', 'manuals');
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, storedName), fileBuffer);
+    }
 
     let extractedText = null;
     let extractMethod = 'none';
     try {
-      const extracted = await extractPdfText(req.file.path);
+      const extracted = await extractPdfText(fileBuffer);
       if (extracted) {
         extractedText = extracted.text;
         extractMethod = extracted.method;
-        saveSidecarText(req.file.filename, extractedText, path.join(DATA_DIR, 'uploads'));
+        await saveSidecarText(storedName, extractedText, path.join(DATA_DIR, 'uploads'));
         console.log('Text extracted via', extractMethod, '—', extractedText.length, 'chars');
       }
     } catch(e) { console.error('Text extraction failed:', e.message); }
@@ -2229,7 +2262,8 @@ app.post('/api/repo/upload', requireAuth, uploadManual.single('file'), async (re
       id:           'man_' + Date.now().toString(36),
       vessel_id:    req.body.vessel_id || '',
       filename:     req.file.originalname,
-      stored_name:  req.file.filename,
+      stored_name:  storedName,
+      r2_key:       r2Key,
       size_bytes:   req.file.size,
       category:     meta.category || 'General',
       equipment_name: meta.equipment_name || '',
@@ -2269,16 +2303,31 @@ app.post('/api/repo/manuals/:id/reextract', requireAuth, async (req, res) => {
     if (!manual) return res.status(404).json({ error: 'Manual not found' });
 
     const fp = path.join(DATA_DIR, 'uploads', 'manuals', manual.stored_name);
-    if (!fs.existsSync(fp)) return res.status(404).json({ error: 'File not found on disk — re-upload the manual' });
+
+    // If file is not on disk, try downloading from R2
+    let pdfBuffer = null;
+    if (!fs.existsSync(fp)) {
+      if (r2.isEnabled() && manual.stored_name) {
+        try {
+          pdfBuffer = await r2.downloadPdf(manual.stored_name);
+          console.log('[R2] Downloaded PDF for reextract:', manual.stored_name, pdfBuffer.length, 'bytes');
+        } catch(e) {
+          return res.status(404).json({ error: 'File not found on disk or R2 — re-upload the manual' });
+        }
+      } else {
+        return res.status(404).json({ error: 'File not found on disk — re-upload the manual' });
+      }
+    }
 
     res.json({ message: 'Extraction started', filename: manual.filename });
 
     (async () => {
       try {
-        const extracted = await extractPdfText(fp);
+        const inputSource = pdfBuffer || fp;
+        const extracted = await extractPdfText(inputSource);
         if (!extracted || !extracted.text) { console.error('Re-extract failed for:', manual.filename); return; }
 
-        saveSidecarText(manual.stored_name, extracted.text, path.join(DATA_DIR, 'uploads'));
+        await saveSidecarText(manual.stored_name, extracted.text, path.join(DATA_DIR, 'uploads'));
 
         let meta = {};
         try {
@@ -2358,6 +2407,11 @@ app.delete('/api/repo/manuals/:id', requireAuth, (req, res) => {
     if (!manual) return res.status(404).json({ error: 'Not found' });
     // Remove pgvector embeddings
     rag.deleteManual(manual.id).catch(e => console.error('[RAG] Delete error:', e.message));
+    // Delete from R2
+    if (r2.isEnabled() && manual.stored_name) {
+      r2.deleteManualFiles(manual.stored_name).catch(e => console.error('[R2] Delete error:', e.message));
+    }
+    // Also clean up local disk if present
     try {
       const fp = path.join(DATA_DIR, 'uploads', 'manuals', manual.stored_name);
       if (fs.existsSync(fp)) fs.unlinkSync(fp);
@@ -2380,13 +2434,26 @@ app.patch('/api/repo/manuals/:id', requireAuth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/repo/manuals/:id/file', requireAuth, (req, res) => {
+app.get('/api/repo/manuals/:id/file', requireAuth, async (req, res) => {
   try {
     const db = readRepoDb();
     const manual = db.manuals.find(m => m.id === req.params.id);
     if (!manual) return res.status(404).json({ error: 'Not found' });
+
+    // Try R2 first (presigned URL redirect)
+    if (r2.isEnabled() && manual.stored_name) {
+      try {
+        const url = await r2.getPresignedUrl(manual.stored_name, 3600);
+        return res.redirect(302, url);
+      } catch(e) {
+        console.error('[R2] Presigned URL failed:', e.message);
+        // Fall through to disk fallback
+      }
+    }
+
+    // Fallback: local disk (dev/ephemeral)
     const fp = path.join(DATA_DIR, 'uploads', 'manuals', manual.stored_name);
-    if (!fs.existsSync(fp)) return res.status(404).json({ error: 'File not found on disk' });
+    if (!fs.existsSync(fp)) return res.status(404).json({ error: 'File not found — R2 not configured or file missing' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${manual.filename}"`);
     fs.createReadStream(fp).pipe(res);
@@ -2531,7 +2598,7 @@ As a senior marine engineer, expand on the answer — explain the engineering re
     const noText = [];
 
     for (const m of toScan) {
-      const sidecar = loadSidecarText(m.stored_name, path.join(DATA_DIR, 'uploads'));
+      const sidecar = await loadSidecarTextAsync(m.stored_name, path.join(DATA_DIR, 'uploads'));
       if (sidecar) {
         const MAX_CHARS = 60000;
         let chunk;
@@ -2628,7 +2695,7 @@ app.post('/api/rag/index/:id', requireAuth, async (req, res) => {
     const manual = db.manuals.find(m => m.id === req.params.id);
     if (!manual) return res.status(404).json({ error: 'Manual not found' });
 
-    const sidecar = loadSidecarText(manual.stored_name, path.join(DATA_DIR, 'uploads'));
+    const sidecar = await loadSidecarTextAsync(manual.stored_name, path.join(DATA_DIR, 'uploads'));
     if (!sidecar) return res.status(400).json({ error: 'No extracted text — run ⚙ Extract first' });
 
     res.json({ message: 'Indexing started', filename: manual.filename });
@@ -2652,7 +2719,7 @@ app.post('/api/rag/index-all', requireAuth, async (req, res) => {
     (async () => {
       let ok = 0, fail = 0;
       for (const manual of toIndex) {
-        const sidecar = loadSidecarText(manual.stored_name, path.join(DATA_DIR, 'uploads'));
+        const sidecar = await loadSidecarTextAsync(manual.stored_name, path.join(DATA_DIR, 'uploads'));
         if (!sidecar) { fail++; continue; }
         const r = await rag.indexManual(manual, sidecar).catch(() => ({ ok: false }));
         r.ok ? ok++ : fail++;
