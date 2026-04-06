@@ -435,34 +435,6 @@ app.post('/api/investigate', requireAuth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-
-// ── ONE-TIME ADMIN RESET (remove after use) ───────────────────────────────
-app.get('/api/reset-admin-now', (req, res) => {
-  try {
-    const db = readDB();
-    const newEmail = process.env.ADMIN_EMAIL || 'akinmoladun.omolade@nsml.com';
-    const newPass  = process.env.ADMIN_PASSWORD || 'Forcap@2025!';
-    const adminIdx = db.users.findIndex(u => u.role === 'admin');
-    if (adminIdx === -1) {
-      // Seed fresh
-      db.users.push({
-        id: 'user_admin',
-        name: 'System Administrator',
-        email: newEmail,
-        password: hashPassword(newPass),
-        role: 'admin',
-        vessel_ids: [],
-        created_at: new Date().toISOString()
-      });
-    } else {
-      db.users[adminIdx].email    = newEmail;
-      db.users[adminIdx].password = hashPassword(newPass);
-    }
-    writeDB(db);
-    res.json({ ok: true, email: newEmail, password: newPass });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
 app.listen(PORT, () => {
   console.log(`MARIDE server running on port ${PORT}`);
 });
