@@ -11073,10 +11073,10 @@ function buildDecisionForReport() {
     <div id="repoDropZone" style="border:2px dashed var(--border);border-radius:8px;padding:24px;text-align:center;cursor:pointer;margin-bottom:14px;"
       ondrop="repoHandleDrop(event)" ondragover="event.preventDefault()" onclick="document.getElementById('repoFileInput').click()">
       <div style="font-size:28px;">&#x1F4C4;</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text-bright);margin-top:6px;">Drop PDF here or click to browse</div>
-      <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Max 50MB &middot; PDF only &middot; AI auto-categorises on upload</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text-bright);margin-top:6px;">Drop PDFs here or click to browse</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Select one or multiple PDFs &middot; Max 50MB each &middot; AI auto-categorises each file</div>
     </div>
-    <input type="file" id="repoFileInput" accept=".pdf" style="display:none;" onchange="repoFileSelected(this)">
+    <input type="file" id="repoFileInput" accept=".pdf" multiple style="display:none;" onchange="repoFileSelected(this)">
     <div id="repoFileChosen" style="display:none;font-family:var(--mono);font-size:10px;color:var(--green);margin-bottom:10px;"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div class="fg"><label>Version / Revision</label><input id="repoVersion" value="1.0" placeholder="e.g. Rev 3"></div>
