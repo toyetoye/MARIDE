@@ -41,22 +41,35 @@ function repoRenderVesselSelector() {
   const el = document.getElementById('repoVesselSelector');
   if (!el) return;
 
-  const all = document.createElement('button');
-  all.className = 'btn-sm btn-sm-ghost' + (repoSelectedVessel === null ? ' sel-ready' : '');
-  all.style.cssText = 'font-size:10px;padding:3px 10px;';
-  all.textContent = 'ALL';
-  all.onclick = () => repoSelectVessel(null);
-  el.innerHTML = '';
-  el.appendChild(all);
+  const currentVessel = repoSelectedVessel
+    ? (repoVessels.find(v => v.id === repoSelectedVessel)?.name || 'Unknown')
+    : 'All vessels';
 
-  repoVessels.forEach(v => {
-    const btn = document.createElement('button');
-    btn.className = 'btn-sm btn-sm-ghost' + (repoSelectedVessel === v.id ? ' sel-ready' : '');
-    btn.style.cssText = 'font-size:10px;padding:3px 10px;';
-    btn.textContent = v.name;
-    btn.onclick = () => repoSelectVessel(v.id);
-    el.appendChild(btn);
-  });
+  el.innerHTML = `
+    <div style="position:relative;display:inline-block;">
+      <select id="repoVesselDropdown"
+        style="appearance:none;-webkit-appearance:none;background:var(--surface2,#1a1a1a);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:11px;padding:5px 32px 5px 10px;cursor:pointer;min-width:200px;"
+        onchange="repoConfirmVesselChange(this.value)">
+        <option value="">All vessels</option>
+        ${repoVessels.map(v =>
+          `<option value="${v.id}" ${repoSelectedVessel === v.id ? 'selected' : ''}>${v.name}</option>`
+        ).join('')}
+      </select>
+      <span style="pointer-events:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-dim);">▾</span>
+    </div>`;
+}
+
+function repoConfirmVesselChange(vesselId) {
+  const vesselName = vesselId
+    ? (repoVessels.find(v => v.id === vesselId)?.name || 'Unknown')
+    : 'All vessels';
+
+  const confirmed = confirm(\`Switch to: \${vesselName}\n\nThis will load all manuals for this vessel.\`);
+  if (!confirmed) {
+    repoRenderVesselSelector();
+    return;
+  }
+  repoSelectVessel(vesselId || null);
 }
 
 function repoSelectVessel(vesselId) {
