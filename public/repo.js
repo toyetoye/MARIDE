@@ -9,7 +9,7 @@ let repoVessels       = [];
 let repoManuals       = [];
 let repoSelectedVessel = null;
 let repoSelectedCat   = 'all';
-let repoSelectedFile  = null;
+let repoSelectedFiles = [];
 
 // ── Helpers (defined in index.html, available globally) ──────────────────────
 // getToken(), getCurrentUser() — defined in index.html
@@ -257,10 +257,9 @@ function repoOpenFile(manualId) {
 
 // ── Upload Flow ───────────────────────────────────────────────────────────────
 function openManualUpload() {
-  // Populate equipment link dropdown
   const eqSel = document.getElementById('repoEqLink');
   if (eqSel && repoSelectedVessel) {
-    fetch(`/api/custodian/equipment?vessel_id=${repoSelectedVessel}`, {
+    fetch('/api/custodian/equipment?vessel_id=' + repoSelectedVessel, {
       headers: { 'x-auth-token': getToken() }
     }).then(r => r.json()).then(eq => {
       eqSel.innerHTML = '<option value="">Not linked</option>';
@@ -272,42 +271,55 @@ function openManualUpload() {
       });
     }).catch(() => {});
   }
-  repoSelectedFile = null;
+  repoSelectedFiles = [];
   document.getElementById('repoFileChosen').style.display = 'none';
-  document.getElementById('repoFileChosen').textContent = '';
+  document.getElementById('repoFileChosen').innerHTML = '';
   document.getElementById('repoUploadErr').style.display = 'none';
   document.getElementById('repoUploadProgress').style.display = 'none';
   document.getElementById('repoProgBar').style.width = '0%';
   document.getElementById('repoUploadSubmit').disabled = false;
+  // Switch file input to accept multiple
+  const fi = document.getElementById('repoFileInput');
+  if (fi) fi.multiple = true;
   document.getElementById('manualUploadModal').classList.add('open');
 }
 
 function repoFileSelected(input) {
-  const file = input.files[0];
-  if (!file) return;
-  repoSelectedFile = file;
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  repoSelectedFiles = files;
   const el = document.getElementById('repoFileChosen');
-  el.textContent = `✓ ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`;
+  if (files.length === 1) {
+    el.innerHTML = '&#10003; ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + 'MB)';
+  } else {
+    el.innerHTML = '&#10003; ' + files.length + ' files selected:<br>' +
+      files.map(function(f) {
+        return '&nbsp;&nbsp;' + f.name + ' (' + (f.size/1024/1024).toFixed(1) + 'MB)';
+      }).join('<br>');
+  }
   el.style.display = 'block';
 }
 
 function repoHandleDrop(e) {
   e.preventDefault();
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  if (file.type !== 'application/pdf') {
-    alert('Only PDF files are supported');
-    return;
-  }
-  repoSelectedFile = file;
+  const files = Array.from(e.dataTransfer.files).filter(function(f) { return f.type === 'application/pdf'; });
+  if (!files.length) { alert('Only PDF files are supported'); return; }
+  repoSelectedFiles = files;
   const el = document.getElementById('repoFileChosen');
-  el.textContent = `✓ ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`;
+  if (files.length === 1) {
+    el.innerHTML = '&#10003; ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + 'MB)';
+  } else {
+    el.innerHTML = '&#10003; ' + files.length + ' files dropped:<br>' +
+      files.map(function(f) {
+        return '&nbsp;&nbsp;' + f.name + ' (' + (f.size/1024/1024).toFixed(1) + 'MB)';
+      }).join('<br>');
+  }
   el.style.display = 'block';
 }
 
 async function repoSubmitUpload() {
-  if (!repoSelectedFile) {
-    document.getElementById('repoUploadErr').textContent = 'Please select a PDF file first.';
+  if (!repoSelectedFiles || !repoSelectedFiles.length) {
+    document.getElementById('repoUploadErr').textContent = 'Please select at least one PDF file.';
     document.getElementById('repoUploadErr').style.display = 'block';
     return;
   }
@@ -321,47 +333,55 @@ async function repoSubmitUpload() {
   submitBtn.disabled = true;
   errEl.style.display = 'none';
   progEl.style.display = 'block';
-  statusMsg.textContent = 'Uploading to R2 storage…';
-  progBar.style.width = '20%';
 
-  try {
-    const fd = new FormData();
-    fd.append('file', repoSelectedFile);
-    if (repoSelectedVessel) fd.append('vessel_id', repoSelectedVessel);
-    fd.append('version', document.getElementById('repoVersion')?.value || '1.0');
-    const eqLink = document.getElementById('repoEqLink')?.value;
-    if (eqLink) fd.append('equipment_id', eqLink);
+  const total   = repoSelectedFiles.length;
+  let done      = 0;
+  let failed    = [];
 
-    progBar.style.width = '40%';
-    statusMsg.textContent = 'Analysing with AI…';
+  for (let i = 0; i < repoSelectedFiles.length; i++) {
+    const file = repoSelectedFiles[i];
+    statusMsg.textContent = 'Uploading ' + (i + 1) + ' of ' + total + ': ' + file.name;
+    progBar.style.width = Math.round((i / total) * 85) + '%';
 
-    const res = await fetch('/api/repo/upload', {
-      method: 'POST',
-      headers: { 'x-auth-token': getToken() },
-      body: fd
-    });
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      if (repoSelectedVessel) fd.append('vessel_id', repoSelectedVessel);
+      fd.append('version', document.getElementById('repoVersion') ? document.getElementById('repoVersion').value || '1.0' : '1.0');
+      const eqLink = document.getElementById('repoEqLink') ? document.getElementById('repoEqLink').value : '';
+      if (eqLink) fd.append('equipment_id', eqLink);
 
-    progBar.style.width = '90%';
+      const res = await fetch('/api/repo/upload', {
+        method: 'POST',
+        headers: { 'x-auth-token': getToken() },
+        body: fd
+      });
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Upload failed');
+      if (!res.ok) {
+        const err = await res.json();
+        failed.push(file.name + ': ' + (err.error || 'Upload failed'));
+      } else {
+        done++;
+      }
+    } catch(e) {
+      failed.push(file.name + ': ' + e.message);
     }
+  }
 
-    const manual = await res.json();
-    progBar.style.width = '100%';
-    statusMsg.textContent = `✓ Uploaded: ${manual.category} — ${manual.equipment_name || manual.filename}`;
+  progBar.style.width = '100%';
 
-    setTimeout(() => {
+  if (failed.length === 0) {
+    statusMsg.textContent = '&#10003; ' + done + ' of ' + total + ' file' + (total > 1 ? 's' : '') + ' uploaded successfully.';
+    setTimeout(function() {
       document.getElementById('manualUploadModal').classList.remove('open');
       repoLoadManuals();
-    }, 1200);
-
-  } catch(e) {
-    progEl.style.display = 'none';
-    errEl.textContent = e.message;
+    }, 1500);
+  } else {
+    statusMsg.textContent = done + ' uploaded, ' + failed.length + ' failed.';
+    errEl.innerHTML = 'Failed:<br>' + failed.join('<br>');
     errEl.style.display = 'block';
     submitBtn.disabled = false;
+    repoLoadManuals();
   }
 }
 
