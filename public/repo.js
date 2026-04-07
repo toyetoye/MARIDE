@@ -64,7 +64,7 @@ function repoConfirmVesselChange(vesselId) {
     ? (repoVessels.find(v => v.id === vesselId)?.name || 'Unknown')
     : 'All vessels';
 
-  const confirmed = confirm(\`Switch to: \${vesselName}\n\nThis will load all manuals for this vessel.\`);
+  const confirmed = confirm('Switch to: ' + vesselName + '\n\nThis will load all manuals for this vessel.');
   if (!confirmed) {
     repoRenderVesselSelector();
     return;
