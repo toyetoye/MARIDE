@@ -150,6 +150,65 @@ function repoSelectCat(cat) {
   repoRender();
 }
 
+
+// ── Categories ────────────────────────────────────────────────────────────────
+const REPO_CATEGORIES = [
+  'Main Engine','Auxiliary Engine','Cargo System','IGS/Inert Gas',
+  'Cargo Compressors','Pumps','Electrical','Navigation','Safety Systems',
+  'Fire Fighting','HVAC','Mooring','Crane/Deck Machinery','Boiler',
+  'Purifier','Regulatory/SIRE','OEM Service Letter','Maker Bulletin',
+  'SMS Procedure','General'
+];
+
+function repoShowCatEdit(manualId) {
+  const row = document.getElementById('cat-row-' + manualId);
+  if (!row) return;
+  const current = row.getAttribute('data-cat') || 'General';
+  const opts = REPO_CATEGORIES.map(function(c) {
+    return '<option value="' + c + '"' + (c === current ? ' selected' : '') + '>' + c + '</option>';
+  }).join('');
+  const sel = document.createElement('select');
+  sel.style.cssText = 'background:var(--surface2,#111);border:1px solid var(--amber);border-radius:4px;color:var(--amber);font-family:var(--mono);font-size:9px;padding:2px 6px;cursor:pointer;';
+  sel.innerHTML = opts;
+  sel.onchange = function() { repoSaveCat(manualId, sel.value); };
+  sel.onblur   = function() { repoRevertCat(manualId); };
+  row.innerHTML = '';
+  row.appendChild(sel);
+  sel.focus();
+}
+
+function repoRevertCat(manualId) {
+  const row = document.getElementById('cat-row-' + manualId);
+  if (!row) return;
+  const current = row.getAttribute('data-cat') || 'General';
+  const span = document.createElement('span');
+  span.style.cssText = 'background:rgba(245,166,35,0.1);color:var(--amber);border:1px solid rgba(245,166,35,0.3);border-radius:3px;font-family:var(--mono);font-size:8px;padding:1px 5px;cursor:pointer;';
+  span.title = 'Click to reassign category';
+  span.innerHTML = current.toUpperCase() + ' &#9998;';
+  span.onclick = function() { repoShowCatEdit(manualId); };
+  row.innerHTML = '';
+  row.appendChild(span);
+}
+
+async function repoSaveCat(manualId, newCat) {
+  try {
+    const res = await repoFetch('/api/repo/manuals/' + manualId, {
+      method: 'PATCH',
+      body: JSON.stringify({ category: newCat })
+    });
+    if (!res.ok) throw new Error((await res.json()).error);
+    const manual = repoManuals.find(function(m) { return m.id === manualId; });
+    if (manual) manual.category = newCat;
+    const row = document.getElementById('cat-row-' + manualId);
+    if (row) row.setAttribute('data-cat', newCat);
+    repoRevertCat(manualId);
+    repoRenderCats();
+  } catch(e) {
+    alert('Failed to update category: ' + e.message);
+    repoRevertCat(manualId);
+  }
+}
+
 // ── Manual Cards ──────────────────────────────────────────────────────────────
 function repoRender() {
   const contentEl = document.getElementById('repoContent');
@@ -217,7 +276,7 @@ function repoManualCard(m, canEdit) {
           <span style="font-size:13px;font-weight:600;color:var(--text-bright);word-break:break-word;">${m.filename}</span>
           ${ragBadge} ${supersededBadge} ${slBadge}
         </div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--amber);letter-spacing:1px;margin-bottom:4px;">${(m.category||'General').toUpperCase()}</div>
+        <div id="cat-row-${m.id}" data-cat="${m.category||'General'}" style="margin-bottom:4px;"><span style="background:rgba(245,166,35,0.1);color:var(--amber);border:1px solid rgba(245,166,35,0.3);border-radius:3px;font-family:var(--mono);font-size:8px;padding:1px 5px;cursor:pointer;" title="Click to reassign category" onclick="repoShowCatEdit('${m.id}')">${(m.category||'General').toUpperCase()} &#9998;</span></div>
         ${m.equipment_name ? `<div style="font-size:11px;color:var(--text-dim);">${m.equipment_name}${m.maker ? ' · ' + m.maker : ''}${m.model ? ' / ' + m.model : ''}</div>` : ''}
         ${m.summary ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.5;">${m.summary}</div>` : ''}
         <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
@@ -278,24 +337,36 @@ function openManualUpload() {
   document.getElementById('repoUploadProgress').style.display = 'none';
   document.getElementById('repoProgBar').style.width = '0%';
   document.getElementById('repoUploadSubmit').disabled = false;
-  // Switch file input to accept multiple
   const fi = document.getElementById('repoFileInput');
-  if (fi) fi.multiple = true;
+  if (fi) fi.value = '';
+  const ff = document.getElementById('repoFolderInput');
+  if (ff) ff.value = '';
   document.getElementById('manualUploadModal').classList.add('open');
 }
 
 function repoFileSelected(input) {
-  const files = Array.from(input.files);
-  if (!files.length) return;
+  const files = Array.from(input.files).filter(function(f) {
+    return f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+  });
+  if (!files.length) {
+    alert('No PDF files found in selection.');
+    return;
+  }
   repoSelectedFiles = files;
+  repoShowFileChosen(files, input.webkitdirectory ? 'folder' : 'files');
+}
+
+function repoShowFileChosen(files, mode) {
   const el = document.getElementById('repoFileChosen');
+  const totalMB = files.reduce(function(a,f) { return a + f.size; }, 0) / 1024 / 1024;
   if (files.length === 1) {
-    el.innerHTML = '&#10003; ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + 'MB)';
+    el.innerHTML = '&#10003; ' + files[0].name + ' (' + totalMB.toFixed(1) + 'MB)';
   } else {
-    el.innerHTML = '&#10003; ' + files.length + ' files selected:<br>' +
-      files.map(function(f) {
-        return '&nbsp;&nbsp;' + f.name + ' (' + (f.size/1024/1024).toFixed(1) + 'MB)';
-      }).join('<br>');
+    const label = mode === 'folder' ? 'PDFs found in folder' : 'files selected';
+    el.innerHTML = '&#10003; <strong>' + files.length + ' ' + label + '</strong> &mdash; ' + totalMB.toFixed(1) + 'MB total<br><span style="font-size:9px;opacity:0.6;">' +
+      files.slice(0,5).map(function(f){ return f.name; }).join(', ') +
+      (files.length > 5 ? ' &hellip; and ' + (files.length - 5) + ' more' : '') +
+      '</span>';
   }
   el.style.display = 'block';
 }
@@ -305,16 +376,7 @@ function repoHandleDrop(e) {
   const files = Array.from(e.dataTransfer.files).filter(function(f) { return f.type === 'application/pdf'; });
   if (!files.length) { alert('Only PDF files are supported'); return; }
   repoSelectedFiles = files;
-  const el = document.getElementById('repoFileChosen');
-  if (files.length === 1) {
-    el.innerHTML = '&#10003; ' + files[0].name + ' (' + (files[0].size/1024/1024).toFixed(1) + 'MB)';
-  } else {
-    el.innerHTML = '&#10003; ' + files.length + ' files dropped:<br>' +
-      files.map(function(f) {
-        return '&nbsp;&nbsp;' + f.name + ' (' + (f.size/1024/1024).toFixed(1) + 'MB)';
-      }).join('<br>');
-  }
-  el.style.display = 'block';
+  repoShowFileChosen(files, 'files');
 }
 
 async function repoSubmitUpload() {
