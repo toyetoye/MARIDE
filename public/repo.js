@@ -12,7 +12,7 @@ let repoSelectedCat   = 'all';
 let repoSelectedFile  = null;
 
 // ── Helpers (defined in index.html, available globally) ──────────────────────
-// getToken(), getCurrentUser(), openModal(), closeModal()
+// getToken(), getCurrentUser() — defined in index.html
 
 const REPO_API = '';  // same origin
 
@@ -266,7 +266,7 @@ function openManualUpload() {
   document.getElementById('repoUploadProgress').style.display = 'none';
   document.getElementById('repoProgBar').style.width = '0%';
   document.getElementById('repoUploadSubmit').disabled = false;
-  openModal('manualUploadModal');
+  document.getElementById('manualUploadModal').classList.add('open');
 }
 
 function repoFileSelected(input) {
@@ -340,7 +340,7 @@ async function repoSubmitUpload() {
     statusMsg.textContent = `✓ Uploaded: ${manual.category} — ${manual.equipment_name || manual.filename}`;
 
     setTimeout(() => {
-      closeModal('manualUploadModal');
+      document.getElementById('manualUploadModal').classList.remove('open');
       repoLoadManuals();
     }, 1200);
 
@@ -388,7 +388,7 @@ function repoAddSL(manualId) {
   document.getElementById('repoSLDate').value = '';
   document.getElementById('repoSLNotes').value = '';
   document.getElementById('repoSLAction').value = 'for_information';
-  openModal('repoSLModal');
+  document.getElementById('repoSLModal').classList.add('open');
 }
 
 async function repoSaveSL() {
@@ -415,7 +415,7 @@ async function repoSaveSL() {
     if (!res.ok) throw new Error((await res.json()).error);
 
     manual.service_letters = sls;
-    closeModal('repoSLModal');
+    document.getElementById('repoSLModal').classList.remove('open');
     repoRender();
   } catch(e) {
     alert('Save failed: ' + e.message);
