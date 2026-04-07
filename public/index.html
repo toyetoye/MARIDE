@@ -11077,6 +11077,10 @@ function buildDecisionForReport() {
       <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Select one or multiple PDFs &middot; Max 50MB each &middot; AI auto-categorises each file</div>
     </div>
     <input type="file" id="repoFileInput" accept=".pdf" multiple style="display:none;" onchange="repoFileSelected(this)">
+    <input type="file" id="repoFolderInput" webkitdirectory mozdirectory style="display:none;" onchange="repoFileSelected(this)">
+    <div style="text-align:center;margin-bottom:10px;">
+      <button type="button" class="btn-sm btn-sm-ghost" style="font-size:10px;" onclick="document.getElementById('repoFolderInput').click()">&#128193; Select folder instead</button>
+    </div>
     <div id="repoFileChosen" style="display:none;font-family:var(--mono);font-size:10px;color:var(--green);margin-bottom:10px;"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
       <div class="fg"><label>Version / Revision</label><input id="repoVersion" value="1.0" placeholder="e.g. Rev 3"></div>
