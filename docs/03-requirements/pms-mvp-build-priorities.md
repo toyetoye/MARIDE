@@ -10,8 +10,6 @@ Build enough of FORCAP PMS to demonstrate credible replacement of PROP Engineeri
 
 ## P0 Scope
 
-The following features are mandatory for the first PMS MVP:
-
 | Priority | Feature | Reason |
 |---|---|---|
 | P0 | Vessel Selector | Every PMS record is vessel-specific |
@@ -29,8 +27,6 @@ The following features are mandatory for the first PMS MVP:
 
 ## P1 Scope
 
-The following features should follow soon after P0:
-
 | Priority | Feature | Reason |
 |---|---|---|
 | P1 | Running Hours | Required for hourly jobs |
@@ -40,16 +36,3 @@ The following features should follow soon after P0:
 | P1 | Maintenance Forecast | Planning support |
 | P1 | Excel/PDF Export | Familiar PROP replacement |
 | P1 | PMS Dashboard | Better overview than PROP |
-
-## P2 Scope
-
-The following are later enhancements:
-
-| Priority | Feature | Reason |
-|---|---|---|
-| P2 | Offline Drafts | Shipboard usability |
-| P2 | EOM Running Hour Link | Integration with logbook |
-| P2 | AI Maintenance Search | Oracle enhancement |
-| P2 | Class Evidence Pack Export | Certification support |
-| P2 | Mobile/PWA Mode | Shipboard use |
-

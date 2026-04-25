@@ -70,18 +70,7 @@ Each component shall support:
 
 ### PMS-002 Component Hierarchy
 
-FORCAP shall support a hierarchy of:
-
-- vessel
-- system/group
-- assembly
-- component
-- PM template
-- issued worksheet
-- completed worksheet
-- spares
-- files
-- history
+FORCAP shall support a hierarchy of vessel, system/group, assembly, component, PM template, issued worksheet, completed worksheet, spares, files, and history.
 
 ### PMS-003 Component Criticality
 
@@ -93,89 +82,31 @@ Initial criticality groups:
 - Significant
 - Standard
 
-Criticality shall be available as a filter in:
-
-- component explorer
-- issued worksheets
-- overdue worksheets
-- completed worksheet history
-- reports
-- dashboards
+Criticality shall be available as a filter in the component explorer, issued worksheets, overdue worksheets, completed worksheet history, reports, and dashboards.
 
 ### PMS-004 PM Worksheet Templates
 
 FORCAP shall support planned maintenance worksheet templates.
 
-A PM template shall support:
-
-- component
-- job code
-- job title
-- job description
-- frequency type
-- frequency value
-- assigned rank
-- job type
-- safety notes
-- required measurements
-- required attachments
-- related spares
-- active/inactive status
-- revision history
+A PM template shall support component, job code, job title, job description, frequency type, frequency value, assigned rank, job type, safety notes, required measurements, required attachments, related spares, active/inactive status, and revision history.
 
 ### PMS-005 Issued Worksheets
 
-FORCAP shall issue worksheets from PM templates based on:
-
-- calendar/date interval
-- running hours
-- condition-based requirement, later phase
-- manual issue by authorised user
-
-Issued worksheet fields shall include:
-
-- worksheet number
-- vessel
-- component
-- job code
-- job description
-- assigned rank
-- original due date
-- deferred-until date, where applicable
-- status
-- criticality
-- type
-- created/issued by
-- created/issued date
+FORCAP shall issue worksheets from PM templates based on calendar/date interval, running hours, condition-based requirement later, or manual issue by authorised user.
 
 ### PMS-006 Deferral Workflow
 
 FORCAP shall allow authorised users to defer worksheets according to configured rules.
 
-Deferral shall require:
-
-- permission
-- reason
-- new deferred-until date or running-hour counter
-- audit event
-- visibility in reports
+Deferral shall require permission, reason, new deferred-until date or running-hour counter, audit event, and visibility in reports.
 
 ### PMS-007 Completion Workflow
 
 FORCAP shall allow assigned or authorised users to complete worksheet records.
 
-Completion shall require:
+Completion shall require date completed, completed by person, completed by rank, work comments, measurements where required, running hours where required, parts used where applicable, and attachments where applicable.
 
-- date completed
-- completed by person
-- completed by rank
-- work comments
-- measurements, where required
-- running hours, where required
-- parts used, where applicable
-- attachments, where applicable
-
-The system should discourage weak completion comments such as "done", "ok", or "satisfactory" where more detail is required.
+The system should discourage weak completion comments such as 'done', 'ok', or 'satisfactory' where more detail is required.
 
 ### PMS-008 Chief Engineer Authorisation
 
@@ -183,58 +114,21 @@ FORCAP shall require Chief Engineer or authorised role review before a completed
 
 ### PMS-009 Return Workflow
 
-FORCAP shall allow the Chief Engineer or authorised role to return a completed worksheet for correction.
-
-Return shall require:
-
-- reason
-- returned by
-- returned date
-- audit event
+FORCAP shall allow the Chief Engineer or authorised role to return a completed worksheet for correction. Return shall require reason, returned by, returned date, and audit event.
 
 ### PMS-010 Completed Worksheet History
 
-FORCAP shall preserve completed worksheet history by:
-
-- vessel
-- component
-- job
-- date range
-- rank/person
-- criticality
-- job type
-- due/completed/deferred status
+FORCAP shall preserve completed worksheet history by vessel, component, job, date range, rank/person, criticality, job type, and due/completed/deferred status.
 
 ### PMS-011 Ad-hoc Maintenance
 
-FORCAP shall allow users to enter ad-hoc maintenance reports linked to:
-
-- vessel
-- component, where applicable
-- responsible rank/person
-- date completed
-- description
-- attachments
-- related defect/action, later phase
+FORCAP shall allow users to enter ad-hoc maintenance reports linked to vessel, component where applicable, responsible rank/person, date completed, description, attachments, and related defect/action in a later phase.
 
 ### PMS-012 Running Hours
 
 FORCAP shall record running hours and support running-hour-based maintenance triggers.
 
-Running-hour records shall support:
-
-- vessel
-- equipment/component
-- counter name
-- reading
-- reading date/time
-- entered by
-- source module, if linked from EOM later
-- audit event
-
 ### PMS-013 PMS Reports
-
-FORCAP shall generate PMS reports comparable to PROP reports.
 
 Initial PMS reports:
 
@@ -259,4 +153,3 @@ Initial PMS reports:
 - Reports shall be exportable.
 - The system shall support future Class evidence requirements.
 - The system shall support shipboard low-connectivity workflows later through draft/autosave and sync status.
-
